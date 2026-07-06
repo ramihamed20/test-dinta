@@ -25,7 +25,7 @@ npm install
 npm run dev
 ```
 
-- Frontend: http://localhost:5173
+- Frontend: http://localhost:5050
 - API: http://localhost:4000
 - Demo login: `demo@dentify.local`
 - Demo password: `dentify123`
