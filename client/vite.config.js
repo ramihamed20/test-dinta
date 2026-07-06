@@ -17,7 +17,7 @@ export default defineConfig({
         background_color: "#070b16",
         display: "standalone",
         orientation: "portrait",
-        start_url: "/",
+        start_url: process.env.GITHUB_ACTIONS ? "/test-dinta/" : "/",
         icons: [
           {
             src: "pwa-192x192.png",
@@ -39,7 +39,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg}"],
-        navigateFallback: "/index.html",
+        navigateFallback: process.env.GITHUB_ACTIONS ? "/test-dinta/index.html" : "/index.html",
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
