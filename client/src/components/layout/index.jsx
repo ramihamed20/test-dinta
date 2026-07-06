@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Icon } from "../../lib/icons.jsx";
 import { navItems, themeOptions } from "../../lib/constants.js";
-import { greeting, readStreakProtection, streakProtectionKey, weekStamp } from "../../lib/utils.js";
 import { assets } from "../../lib/constants.js";
+import { assetPath, greeting, readStreakProtection, streakProtectionKey, weekStamp } from "../../lib/utils.js";
 
 // --- Brand ---
 
@@ -11,7 +11,7 @@ export function Brand() {
   return (
     <div className="brand">
       <span className="brand-mark">
-        <img src="/assets/logo.jpg" alt="Dentify Logo" className="brand-logo-img" />
+        <img src={assetPath("/assets/logo.jpg")} alt="Dentify Logo" className="brand-logo-img" />
       </span>
       <strong>Dentify</strong>
     </div>
@@ -188,7 +188,7 @@ export function Topbar({ user, theme, onThemeChange, onLogout, onMenu, menuOpen,
       </button>
       <div className="profile-menu-wrap" ref={profileMenuRef}>
         <button className="avatar-btn" onClick={() => setOpen(!open)} aria-label="Open profile menu" aria-expanded={open} aria-controls="profile-menu">
-          <img src={assets.mascot} alt="Student avatar" />
+          <img src={assetPath(assets.mascot)} alt="Student avatar" />
         </button>
         {open && (
           <div className="profile-menu" id="profile-menu" role="menu" aria-label="Profile menu">

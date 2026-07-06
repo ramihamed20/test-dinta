@@ -3,6 +3,7 @@ import { Icon } from "../../lib/icons.jsx";
 import { authApi } from "../../lib/api.js";
 import { setToken } from "../../lib/api.js";
 import { assets, quotes } from "../../lib/constants.js";
+import { assetPath } from "../../lib/utils.js";
 
 export function AuthPage({ onAuthed }) {
   const [mode, setMode] = useState("login");
@@ -73,7 +74,7 @@ export function AuthPage({ onAuthed }) {
       <section className="auth-card" aria-label="Dentify authentication">
         <aside className="auth-art" aria-label="Dentify study illustration">
           <div className="auth-art-content">
-            <img src={assets.login} alt="Dentify illustration" className="auth-mascot-img" />
+            <img src={assetPath(assets.login)} alt="Dentify illustration" className="auth-mascot-img" />
           </div>
         </aside>
 
@@ -82,7 +83,7 @@ export function AuthPage({ onAuthed }) {
             <div className="auth-brand">
               <div className="auth-brand-logo">
                 <span className="auth-brand-mark">
-                  <img src="/assets/logo.jpg" alt="Dentify Logo" className="brand-logo-img" />
+                  <img src={assetPath("/assets/logo.jpg")} alt="Dentify Logo" className="brand-logo-img" />
                 </span>
               </div>
               <span className="auth-brand-badge">Study Platform</span>

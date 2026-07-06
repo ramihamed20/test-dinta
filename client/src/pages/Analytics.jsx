@@ -1,6 +1,7 @@
 import { api } from "../lib/api.js";
 import { Icon } from "../lib/icons.jsx";
 import { assets } from "../lib/constants.js";
+import { assetPath } from "../lib/utils.js";
 import { useAsyncData } from "../hooks/useAsyncData.js";
 import { Page, LoadingPanel, ErrorPanel, ProgressLine } from "../components/ui/index.jsx";
 
@@ -13,7 +14,7 @@ export default function Analytics() {
     <Page title="Analytics" subtitle="Readiness, accuracy, consistency, and material-level progress.">
       <section className="analytics-hero">
         <div><p className="eyebrow">Predicted readiness</p><h2>{readiness}%</h2><p>Based on solved questions, accuracy, saved review, and study table activity.</p></div>
-        <img src={assets.mascot} alt="Dentify mascot studying" />
+        <img src={assetPath(assets.mascot)} alt="Dentify mascot studying" />
       </section>
       <StudyHeatmap solvedByDay={data.solvedByDay || []} />
       <section className="analytics-grid">

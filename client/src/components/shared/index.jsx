@@ -1,11 +1,12 @@
 import { Icon } from "../../lib/icons.jsx";
 import { SessionConfetti } from "../ui/index.jsx";
+import { assetPath } from "../../lib/utils.js";
 
 export function FullScreenState({ message }) {
   return (
     <main className="screen-state">
       <span className="brand-mark">
-        <img src="/assets/logo.jpg" alt="Dentify Logo" className="brand-logo-img" />
+        <img src={assetPath("/assets/logo.jpg")} alt="Dentify Logo" className="brand-logo-img" />
       </span>
       <p>{message}</p>
     </main>

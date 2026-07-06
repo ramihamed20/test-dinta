@@ -7,10 +7,16 @@ import {
   streakProtectionDefaults
 } from "./constants.js";
 
-// --- Theme helpers ---
+export function assetPath(path) {
+  if (!path) return "";
+  const base = import.meta.env.BASE_URL || "/";
+  const prefix = base.endsWith("/") ? base : `${base}/`;
+  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+  return `${prefix}${cleanPath}`;
+}
 
 export function themePreview(character, theme) {
-  return `/assets/themes/${character}-${theme}.png`;
+  return assetPath(`/assets/themes/${character}-${theme}.png`);
 }
 
 export function autoThemeForDate(date = new Date()) {
