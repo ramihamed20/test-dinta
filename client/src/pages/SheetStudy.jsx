@@ -318,13 +318,81 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
   const [activeTool, setActiveTool] = useState("none"); // "none" (scroll), "pen", "highlighter", "eraser"
   const [activeColor, setActiveColor] = useState("yellow"); // "yellow", "green", "pink", "blue", "red"
   const [brushSize, setBrushSize] = useState("medium"); // "small", "medium", "large"
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // default open/expanded
   const [zoomScale, setZoomScale] = useState(1.2); // start slightly larger for readability
   const [stylusActive, setStylusActive] = useState(false); // true once a pen/stylus pointer is seen this session
+  const [toolbarPosition, setToolbarPosition] = useState({ x: 24, y: 120 });
+  const [isMobile, setIsMobile] = useState(false);
+
+  const isDraggingRef = useRef(false);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const dragStartPos = useRef({ x: 0, y: 0 });
+  const hasDragged = useRef(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const handleClearAll = () => {
     if (window.confirm("هل أنت متأكد من مسح جميع الرسومات في هذا المستند؟")) {
       setDrawings({});
+    }
+  };
+
+  const handleDragStart = (e) => {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    e.preventDefault();
+    
+    const sidebar = e.currentTarget.closest(".pdf-study-sidebar");
+    if (!sidebar) return;
+    
+    const rect = sidebar.getBoundingClientRect();
+    dragOffsetRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    hasDragged.current = false;
+    isDraggingRef.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleDragMove = (e) => {
+    if (!isDraggingRef.current) return;
+    e.preventDefault();
+    
+    const dx = e.clientX - dragStartPos.current.x;
+    const dy = e.clientY - dragStartPos.current.y;
+    if (Math.sqrt(dx * dx + dy * dy) > 5) {
+      hasDragged.current = true;
+    }
+
+    let newX = e.clientX - dragOffsetRef.current.x;
+    let newY = e.clientY - dragOffsetRef.current.y;
+    
+    // Boundary checks
+    const sidebarWidth = isSidebarOpen ? 76 : 56;
+    const sidebarHeight = isSidebarOpen ? 450 : 56;
+    newX = Math.max(10, Math.min(window.innerWidth - sidebarWidth - 10, newX));
+    newY = Math.max(80, Math.min(window.innerHeight - sidebarHeight - 10, newY));
+    
+    setToolbarPosition({ x: newX, y: newY });
+  };
+
+  const handleDragEnd = (e) => {
+    if (!isDraggingRef.current) return;
+    e.preventDefault();
+    isDraggingRef.current = false;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+
+    // Click trigger if no drag occurred
+    if (!hasDragged.current) {
+      setIsSidebarOpen(prev => !prev);
     }
   };
 
@@ -356,100 +424,158 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
       </header>
 
       {/* Floating Toolbar Sidebar */}
-      <aside className={`pdf-study-sidebar ${isSidebarOpen ? "open" : ""}`}>
-        <button 
-          className="sidebar-toggle-tab" 
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          aria-label={isSidebarOpen ? "Collapse toolbar" : "Expand toolbar"}
-          title={isSidebarOpen ? "إخفاء شريط الأدوات" : "إظهار شريط الأدوات"}
-        >
-          <Icon name={isSidebarOpen ? "chevron-left" : "chevron-right"} size={16} />
-        </button>
-        {stylusActive && (
-          <div className="stylus-status-badge" role="status" title="تم اكتشاف القلم الرقمي - رفض راحة اليد مفعّل">
-            <Icon name="pencil" size={13} />
-            <span>القلم متصل - رفض اللمس مفعّل</span>
-          </div>
-        )}
-        <div className="sidebar-section">
-          <span className="sidebar-section-title">الأدوات</span>
+      <aside 
+        className={`pdf-study-sidebar ${isSidebarOpen ? "open" : "collapsed"}`}
+        style={{ left: `${toolbarPosition.x}px`, top: `${toolbarPosition.y}px` }}
+      >
+        {!isSidebarOpen && !isMobile ? (
+          /* Collapsed Bubble Trigger for Desktop */
           <button 
-            className={`tool-button ${activeTool === "none" ? "active" : ""}`} 
-            onClick={() => setActiveTool("none")}
-            title="تصفح وتمرير الصفحة"
+            className="sidebar-collapsed-trigger"
+            onPointerDown={handleDragStart}
+            onPointerMove={handleDragMove}
+            onPointerUp={handleDragEnd}
+            title="انقر لتوسيع أدوات الدراسة (اضغط واسحب لتغيير المكان)"
+            aria-label="Expand study tools"
           >
-            <Icon name="hand" size={18} />
-            <span>تمرير</span>
+            <Icon 
+              name={
+                activeTool === "pen" ? "pencil" :
+                activeTool === "highlighter" ? "highlighter" :
+                activeTool === "eraser" ? "eraser" :
+                "hand"
+              } 
+              size={20} 
+            />
+            {activeTool === "none" && <span className="collapsed-badge-nav">🖐️</span>}
           </button>
-          <button 
-            className={`tool-button ${activeTool === "pen" ? "active" : ""}`} 
-            onClick={() => setActiveTool("pen")}
-            title="قلم كتابة ورسم"
-          >
-            <Icon name="pencil" size={18} />
-            <span>قلم</span>
-          </button>
-          <button 
-            className={`tool-button ${activeTool === "highlighter" ? "active" : ""}`} 
-            onClick={() => setActiveTool("highlighter")}
-            title="تحديد وإضاءة نصوص"
-          >
-            <Icon name="highlighter" size={18} />
-            <span>تحديد</span>
-          </button>
-          <button 
-            className={`tool-button ${activeTool === "eraser" ? "active" : ""}`} 
-            onClick={() => setActiveTool("eraser")}
-            title="ممحاة الرسومات"
-          >
-            <Icon name="eraser" size={18} />
-            <span>ممحاة</span>
-          </button>
-        </div>
-
-        {(activeTool === "pen" || activeTool === "highlighter") && (
-          <div className="sidebar-section">
-            <span className="sidebar-section-title">الألوان</span>
-            <div className="color-palette">
-              {["yellow", "green", "pink", "blue", "red"].map((color) => (
-                <button
-                  key={color}
-                  className={`color-dot ${activeColor === color ? "active" : ""}`}
-                  onClick={() => setActiveColor(color)}
-                  title={color}
-                  aria-label={color}
-                  aria-pressed={activeColor === color}
+        ) : (
+          /* Expanded state (or Mobile full sheet view) */
+          <>
+            {!isMobile && (
+              <>
+                {/* Drag Grip Handle at the top */}
+                <div 
+                  className="sidebar-drag-handle"
+                  onPointerDown={handleDragStart}
+                  onPointerMove={handleDragMove}
+                  onPointerUp={handleDragEnd}
+                  title="اسحب لتغيير مكان الأدوات"
                 >
-                  <span className={`color-dot-swatch ${color}`} />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+                  <Icon name="grip" size={16} />
+                </div>
 
-        {activeTool !== "none" && (
-          <div className="sidebar-section">
-            <span className="sidebar-section-title">الحجم</span>
-            <div className="size-selector">
-              {["small", "medium", "large"].map((size) => (
-                <button
-                  key={size}
-                  className={`size-button ${brushSize === size ? "active" : ""}`}
-                  onClick={() => setBrushSize(size)}
+                {/* Collapse button */}
+                <button 
+                  className="sidebar-collapse-trigger"
+                  onClick={() => setIsSidebarOpen(false)}
+                  title="إخفاء الأدوات"
+                  aria-label="Collapse toolbar"
                 >
-                  {size === "small" ? "صغير" : size === "medium" ? "وسط" : "كبير"}
+                  <Icon name="chevron-up" size={14} />
                 </button>
-              ))}
-            </div>
-          </div>
-        )}
+              </>
+            )}
 
-        <div className="sidebar-section" style={{ marginTop: "auto", borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
-          <button className="tool-button danger" onClick={handleClearAll} title="مسح الكل">
-            <Icon name="trash" size={18} />
-            <span>مسح الكل</span>
-          </button>
-        </div>
+            {isMobile && (
+              <button 
+                className="sidebar-toggle-tab" 
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                aria-label={isSidebarOpen ? "Collapse toolbar" : "Expand toolbar"}
+                title={isSidebarOpen ? "إخفاء شريط الأدوات" : "إظهار شريط الأدوات"}
+              >
+                <Icon name={isSidebarOpen ? "chevron-left" : "chevron-right"} size={16} />
+              </button>
+            )}
+
+            {stylusActive && (
+              <div className="stylus-status-badge" role="status" title="تم اكتشاف القلم الرقمي - رفض راحة اليد مفعّل">
+                <Icon name="pencil" size={13} />
+                <span>القلم متصل - رفض اللمس مفعّل</span>
+              </div>
+            )}
+            
+            <div className="sidebar-section">
+              <span className="sidebar-section-title">الأدوات</span>
+              <button 
+                className={`tool-button ${activeTool === "none" ? "active" : ""}`} 
+                onClick={() => setActiveTool("none")}
+                title="تصفح وتمرير الصفحة"
+              >
+                <Icon name="hand" size={18} />
+                <span>تمرير</span>
+              </button>
+              <button 
+                className={`tool-button ${activeTool === "pen" ? "active" : ""}`} 
+                onClick={() => setActiveTool("pen")}
+                title="قلم كتابة ورسم"
+              >
+                <Icon name="pencil" size={18} />
+                <span>قلم</span>
+              </button>
+              <button 
+                className={`tool-button ${activeTool === "highlighter" ? "active" : ""}`} 
+                onClick={() => setActiveTool("highlighter")}
+                title="تحديد وإضاءة نصوص"
+              >
+                <Icon name="highlighter" size={18} />
+                <span>تحديد</span>
+              </button>
+              <button 
+                className={`tool-button ${activeTool === "eraser" ? "active" : ""}`} 
+                onClick={() => setActiveTool("eraser")}
+                title="ممحاة الرسومات"
+              >
+                <Icon name="eraser" size={18} />
+                <span>ممحاة</span>
+              </button>
+            </div>
+
+            {(activeTool === "pen" || activeTool === "highlighter") && (
+              <div className="sidebar-section">
+                <span className="sidebar-section-title">الألوان</span>
+                <div className="color-palette">
+                  {["yellow", "green", "pink", "blue", "red"].map((color) => (
+                    <button
+                      key={color}
+                      className={`color-dot ${activeColor === color ? "active" : ""}`}
+                      onClick={() => setActiveColor(color)}
+                      title={color}
+                      aria-label={color}
+                      aria-pressed={activeColor === color}
+                    >
+                      <span className={`color-dot-swatch ${color}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTool !== "none" && (
+              <div className="sidebar-section">
+                <span className="sidebar-section-title">الحجم</span>
+                <div className="size-selector">
+                  {["small", "medium", "large"].map((size) => (
+                    <button
+                      key={size}
+                      className={`size-button ${brushSize === size ? "active" : ""}`}
+                      onClick={() => setBrushSize(size)}
+                    >
+                      {size === "small" ? "صغير" : size === "medium" ? "وسط" : "كبير"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="sidebar-section" style={{ marginTop: "auto", borderTop: "1px solid var(--border)", paddingTop: "12px", width: "100%" }}>
+              <button className="tool-button danger" onClick={handleClearAll} title="مسح الكل" style={{ width: "100%" }}>
+                <Icon name="trash" size={18} />
+                <span>مسح الكل</span>
+              </button>
+            </div>
+          </>
+        )}
       </aside>
 
       <PdfCanvasViewer 

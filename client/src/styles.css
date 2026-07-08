@@ -8538,38 +8538,123 @@ body,
 /* ===== PDF STUDY SIDEBAR TOOLBAR ===== */
 .pdf-study-sidebar {
   position: fixed;
-  left: 0;
-  top: 96px;
-  width: 76px;
-  background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border);
-  border-left: none; /* sits against the screen edge */
-  border-radius: 0 20px 20px 0;
+  border-radius: 20px;
   padding: 16px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   z-index: 1010;
-  box-shadow: 5px 0 25px rgba(0, 0, 0, 0.25);
-  transform: translateX(-100%); /* start closed/hidden */
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), 
+              height 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              border-radius 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 76px;
+  overflow: visible;
 }
 
-.pdf-study-sidebar.open {
-  transform: translateX(0); /* slide in from left */
-  box-shadow: 5px 0 35px rgba(0, 0, 0, 0.35);
+/* Collapsed Circular Bubble State */
+.pdf-study-sidebar.collapsed {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  padding: 0;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  cursor: grab;
+  touch-action: none;
 }
 
-/* Toggle tab attached to the sidebar right border */
+.pdf-study-sidebar.collapsed:active {
+  cursor: grabbing;
+}
+
+.sidebar-collapsed-trigger {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  position: relative;
+  padding: 0;
+  transition: background 0.2s;
+}
+
+.sidebar-collapsed-trigger:hover {
+  background: var(--bg-hover);
+}
+
+.collapsed-badge-nav {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 10px;
+}
+
+/* Drag grip handle style */
+.sidebar-drag-handle {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 4px 0 8px;
+  cursor: grab;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  touch-action: none;
+}
+
+.sidebar-drag-handle:active {
+  cursor: grabbing;
+}
+
+.sidebar-drag-handle:hover {
+  opacity: 1;
+}
+
+/* Collapse trigger button (Chevron) */
+.sidebar-collapse-trigger {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.sidebar-collapse-trigger:hover {
+  background: var(--bg-hover);
+  color: var(--color-text-primary);
+}
+
+/* Toggle tab (for Mobile Slide Up sheet toggle) */
 .sidebar-toggle-tab {
   position: absolute;
-  right: -44px; /* sticks out to the right of the sidebar bounds */
+  right: -44px;
   top: 50%;
   transform: translateY(-50%);
-  width: 44px; /* meets the 44x44 HIG minimum touch target */
+  width: 44px;
   height: 56px;
   background: color-mix(in srgb, var(--surface-2) 90%, transparent);
   backdrop-filter: blur(20px);
@@ -8590,7 +8675,7 @@ body,
 .sidebar-toggle-tab:hover {
   color: var(--color-text-primary);
   background: var(--bg-hover);
-  width: 48px; /* expands slightly on hover */
+  width: 48px;
   right: -48px;
 }
 

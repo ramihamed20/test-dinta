@@ -45,10 +45,14 @@ import {
   Eraser,
   Hand,
   Trash2,
-  Minus
+  Minus,
+  GripVertical,
+  ChevronUp
 } from "lucide-react";
 
 const icons = {
+  grip: GripVertical,
+  "chevron-up": ChevronUp,
   minus: Minus,
   highlighter: Highlighter,
   eraser: Eraser,
