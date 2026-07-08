@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Icon } from "../../lib/icons.jsx";
-import { authApi } from "../../lib/api.js";
-import { setToken } from "../../lib/api.js";
+import { authApi, setToken } from "../../lib/api.js";
 import { assets, quotes } from "../../lib/constants.js";
 import { assetPath } from "../../lib/utils.js";
 

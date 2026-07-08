@@ -1,5 +1,41 @@
 import { db } from "../db/database.js";
 
+export function getStreak(userId) {
+  // Get distinct dates with attempts, ordered descending
+  const rows = db.prepare(`
+    SELECT DISTINCT date(created_at, 'localtime') AS day
+    FROM attempts
+    WHERE user_id = ?
+    ORDER BY day DESC
+  `).all(userId);
+
+  if (!rows.length) return 0;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().slice(0, 10);
+  const yesterdayDate = new Date(today);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = yesterdayDate.toISOString().slice(0, 10);
+
+  // Streak must start from today or yesterday
+  const firstDay = rows[0].day;
+  if (firstDay !== todayStr && firstDay !== yesterdayStr) return 0;
+
+  let streak = 1;
+  for (let i = 1; i < rows.length; i++) {
+    const prev = new Date(rows[i - 1].day);
+    const curr = new Date(rows[i].day);
+    const diffDays = Math.round((prev - curr) / 86400000);
+    if (diffDays === 1) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
 export function getUserStats(userId) {
   const totalQuestions = db.prepare("SELECT COUNT(*) AS count FROM questions").get().count;
   const attempts = db.prepare("SELECT COUNT(*) AS count FROM attempts WHERE user_id = ?").get(userId).count;

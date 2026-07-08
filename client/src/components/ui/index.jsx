@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
 import { Icon } from "../../lib/icons.jsx";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 export function Page({ title, subtitle, children }) {
+  usePageTitle(title);
   return (
     <div className="page">
       <header className="section-heading"><h2>{title}</h2><p>{subtitle}</p></header>

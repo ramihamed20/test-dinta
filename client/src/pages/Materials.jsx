@@ -11,13 +11,6 @@ export default function Materials() {
 
   return (
     <Page title="Materials" subtitle="Seven study areas with progress, questions, and focused review.">
-      <section className="materials-hero">
-        <div>
-          <p className="eyebrow">Study library</p>
-          <h2>Choose one material and keep the rhythm light.</h2>
-        </div>
-        <Link className="btn btn-primary" to="/questions">Start practice</Link>
-      </section>
       <section className="material-grid">
         {data.map((material) => <MaterialCard key={material.id} material={material} />)}
       </section>
@@ -47,13 +40,6 @@ export function MaterialSheets() {
 
   return (
     <Page title={data.material.title} subtitle="Choose a sheet, then select Normal Study or Advanced Study before opening it.">
-      <section className="materials-hero sheet-hero">
-        <div>
-          <p className="eyebrow">Sheet library</p>
-          <h2>{data.material.description}</h2>
-        </div>
-        <Link className="btn btn-soft" to="/materials">All materials</Link>
-      </section>
       <section className="sheet-grid">
         {data.sheets.map((sheet) => (
           <article className="sheet-card" key={sheet.id}>

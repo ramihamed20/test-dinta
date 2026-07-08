@@ -15,6 +15,7 @@ import {
 import { useAsyncData } from "../hooks/useAsyncData.js";
 import { EmptyState, LoadingPanel, ErrorPanel, ProgressLine, SessionConfetti } from "../components/ui/index.jsx";
 import { LevelUpToast } from "../components/shared/index.jsx";
+import { StatsGrid } from "../components/shared/StatsGrid.jsx";
 import { InstallPrompt } from "../components/shared/InstallPrompt.jsx";
 
 // --- Dashboard ---
@@ -113,12 +114,12 @@ export default function Dashboard({ themeSettings, activeTheme, user, deferredPr
           <ContinueCard material={data.nextMaterial} />
           <DailyGoalCard goal={data.stats.dailyGoal} />
           <DashboardReviewCard items={data.review || []} dueCount={data.stats.dueReviewCount || 0} totalCount={data.stats.reviewCount || 0} />
-          <LevelCard xp={data.stats.xp} />
-          <WeeklyChallengeCard challenge={data.weeklyChallenge} />
+        </div>
+        <div className="dashboard-right">
+          <DashboardHero insight={activeInsight} character={themeSettings.character} theme={activeTheme} />
           <FocusTimerCard />
           <StudyTable initialItems={data.studyPlan} />
         </div>
-        <DashboardHero insight={activeInsight} character={themeSettings.character} theme={activeTheme} />
       </section>
     </div>
   );
@@ -126,28 +127,6 @@ export default function Dashboard({ themeSettings, activeTheme, user, deferredPr
 
 // --- Sub-components ---
 
-function StatsGrid({ stats }) {
-  const cards = [
-    ["Materials", stats.materialsCompleted, "file", "completed"],
-    ["Questions", stats.questionsSolved, "help", "solved"],
-    ["Accuracy", `${stats.accuracy}%`, "check", "correct"],
-    ["Due Review", stats.dueReviewCount || 0, "target", "ready"],
-    ["Saved", stats.savedItems, "bookmark", "items"]
-  ];
-  return (
-    <section className="stats-grid">
-      {cards.map(([label, value, icon, sub]) => (
-        <article className="stat-card" key={label}>
-          <span className="stat-icon"><Icon name={icon} /></span>
-          <div>
-            <strong>{value}</strong>
-            <p>{label}<small>{sub}</small></p>
-          </div>
-        </article>
-      ))}
-    </section>
-  );
-}
 
 function ContinueCard({ material }) {
   const progress = material?.progress || 0;
@@ -358,28 +337,7 @@ function LevelCard({ xp }) {
   );
 }
 
-function WeeklyChallengeCard({ challenge }) {
-  const progress = challenge?.progress || 0;
-  const remaining = challenge?.remaining || 0;
-  return (
-    <article className="panel weekly-challenge-card">
-      <div className="panel-title">
-        <div>
-          <p className="eyebrow">Weekly Challenge</p>
-          <h2>{challenge?.title || "Weekly Solver Sprint"}</h2>
-        </div>
-        <span className="pill success">+{challenge?.rewardXp || 250} XP</span>
-      </div>
-      <p>{challenge?.description || "Solve 50 questions in 7 days."}</p>
-      <ProgressLine value={progress} />
-      <div className="progress-meta">
-        <span>{challenge?.solved || 0}/{challenge?.target || 50} solved</span>
-        <strong>{remaining ? `${remaining} left` : "Completed"}</strong>
-      </div>
-      <Link className="btn btn-primary" to="/questions">Join challenge</Link>
-    </article>
-  );
-}
+
 
 function FocusTimerCard() {
   const [duration, setDuration] = useState(readFocusDurationPreference);

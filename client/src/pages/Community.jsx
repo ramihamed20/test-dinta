@@ -40,7 +40,15 @@ export default function Community() {
           <form className="composer-form" onSubmit={submitPost}>
             <div className="composer-controls">
               {["Question", "Resource", "Study tip"].map((tag) => (
-                <button key={tag} type="button" className={composer.tag === tag ? "active" : ""} onClick={() => setComposer({ ...composer, tag })}>{tag}</button>
+                <button
+                  key={tag}
+                  type="button"
+                  className={composer.tag === tag ? "active" : ""}
+                  aria-pressed={composer.tag === tag}
+                  onClick={() => setComposer({ ...composer, tag })}
+                >
+                  {tag}
+                </button>
               ))}
             </div>
             <textarea value={composer.body} onChange={(event) => setComposer({ ...composer, body: event.target.value })} placeholder="Share a study note or ask your batch..." aria-label="Post composer" />

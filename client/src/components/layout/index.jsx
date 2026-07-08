@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Icon } from "../../lib/icons.jsx";
 import { navItems, themeOptions } from "../../lib/constants.js";
 import { assets } from "../../lib/constants.js";
@@ -76,6 +76,10 @@ export function DrawerThemeSelector({ activeTheme, onThemeChange, tabIndex }) {
 
 export function StreakCard({ user }) {
   const [protection, setProtection] = useState(() => readStreakProtection(user?.email));
+  const [streak, setStreak] = useState(() => {
+    const cached = localStorage.getItem("dentify.streak");
+    return cached ? Number(cached) : 0;
+  });
   const currentWeek = weekStamp();
   const freezeAvailable = protection.usedWeek !== currentWeek;
 
@@ -87,15 +91,28 @@ export function StreakCard({ user }) {
     localStorage.setItem(streakProtectionKey(user?.email), JSON.stringify(protection));
   }, [user?.email, protection]);
 
+  // Fetch real streak from dashboard data
+  useEffect(() => {
+    import("../../lib/api.js").then(({ api }) => {
+      api("/api/dashboard").then((data) => {
+        const s = data?.streak ?? 0;
+        setStreak(s);
+        localStorage.setItem("dentify.streak", String(s));
+      }).catch(() => {});
+    });
+  }, []);
+
   function useFreeze() {
     setProtection({ usedWeek: currentWeek });
   }
 
+  const streakProgress = Math.min(100, Math.max(8, (streak / 30) * 100));
+
   return (
     <div className={`streak-card ${freezeAvailable ? "" : "protected"}`}>
-      <div><Icon name="activity" size={18} /> Keep going!</div>
-      <p>14 day streak</p>
-      <span><i style={{ width: "72%" }} /></span>
+      <div><Icon name="activity" size={18} /> {streak > 0 ? "Keep going!" : "Start today!"}</div>
+      <p>{streak} day streak</p>
+      <span><i style={{ width: `${streakProgress}%` }} /></span>
       <div className="streak-freeze-row">
         <small>{freezeAvailable ? "1 freeze available" : "Freeze used this week"}</small>
         <button type="button" onClick={useFreeze} disabled={!freezeAvailable}>{freezeAvailable ? "Use" : "Protected"}</button>
@@ -138,12 +155,29 @@ export function BottomNav() {
 
 // --- Topbar ---
 
-export function Topbar({ user, theme, onThemeChange, onLogout, onMenu, menuOpen, menuButtonRef }) {
+export function Topbar({ user, theme, onThemeChange, onLogout, onMenu, menuOpen, menuButtonRef, onDropdownOpenChange }) {
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([
+    { id: 1, text: "🏆 Level Up: You reached Level 2!", read: false, time: "Just now" },
+    { id: 2, text: "📅 Spaced Review: 4 questions are due for Endo.", read: false, time: "2 hours ago" },
+    { id: 3, text: "✨ Welcome to your Dentify study workspace!", read: true, time: "Yesterday" }
+  ]);
   const profileMenuRef = useRef(null);
+  const searchRef = useRef(null);
+  const notificationsRef = useRef(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
-  useEffect(() => setOpen(false), [location.pathname, menuOpen]);
+  useEffect(() => {
+    setOpen(false);
+    setNotificationsOpen(false);
+  }, [location.pathname, menuOpen]);
+
+  useEffect(() => {
+    onDropdownOpenChange?.(open || notificationsOpen);
+  }, [open, notificationsOpen, onDropdownOpenChange]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -161,6 +195,53 @@ export function Topbar({ user, theme, onThemeChange, onLogout, onMenu, menuOpen,
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!notificationsOpen) return undefined;
+    const handlePointerDown = (event) => {
+      if (!notificationsRef.current?.contains(event.target)) setNotificationsOpen(false);
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setNotificationsOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [notificationsOpen]);
+
+  // Keyboard shortcut: press / to focus search
+  useEffect(() => {
+    function onGlobalKey(event) {
+      if (event.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", onGlobalKey);
+    return () => document.removeEventListener("keydown", onGlobalKey);
+  }, []);
+
+  function handleSearch(event) {
+    if (event.key === "Enter" && searchQuery.trim()) {
+      navigate(`/questions?search=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery("");
+      searchRef.current?.blur();
+    }
+  }
+
+  function dismissNotification(id, event) {
+    event.stopPropagation();
+    setNotifications(notifications.filter((n) => n.id !== id));
+  }
+
+  function markAllRead() {
+    setNotifications(notifications.map((n) => ({ ...n, read: true })));
+  }
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   function logoutFromMenu() {
     setOpen(false);
     onLogout();
@@ -177,15 +258,60 @@ export function Topbar({ user, theme, onThemeChange, onLogout, onMenu, menuOpen,
       </div>
       <label className="search-box">
         <Icon name="search" size={18} />
-        <input type="search" placeholder="Search Dentify" aria-label="Search Dentify" />
+        <input
+          ref={searchRef}
+          type="search"
+          placeholder="Search Dentify (press /)"
+          aria-label="Search Dentify"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={handleSearch}
+        />
       </label>
       <button className="icon-btn" onClick={() => onThemeChange(theme === "night" ? "day" : "night")} aria-label="Toggle theme">
         <Icon name={theme === "night" ? "sun" : "moon"} />
       </button>
-      <button className="icon-btn" aria-label="Notifications">
-        <Icon name="bell" />
-        <span className="dot" />
-      </button>
+      
+      <div className="notifications-menu-wrap" ref={notificationsRef}>
+        <button 
+          className={`icon-btn ${unreadCount > 0 ? "active" : ""}`} 
+          onClick={() => setNotificationsOpen(!notificationsOpen)}
+          aria-label="Notifications"
+          aria-expanded={notificationsOpen}
+        >
+          <Icon name="bell" />
+          {unreadCount > 0 && <span className="dot" />}
+        </button>
+        {notificationsOpen && (
+          <div className="notifications-dropdown" id="notifications-menu" role="menu">
+            <div className="notifications-header">
+              <h3>Notifications</h3>
+              {unreadCount > 0 && <button className="text-link compact" onClick={markAllRead}>Mark all read</button>}
+            </div>
+            <div className="notifications-list">
+              {notifications.length > 0 ? (
+                notifications.map((n) => (
+                  <div key={n.id} className={`notification-item ${n.read ? "read" : "unread"}`} role="menuitem">
+                    <p>{n.text}</p>
+                    <div className="notification-meta">
+                      <small>{n.time}</small>
+                      <button className="dismiss-btn" onClick={(e) => dismissNotification(n.id, e)} aria-label="Dismiss">
+                        <Icon name="x" size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="notifications-empty">
+                  <Icon name="sparkles" size={20} />
+                  <p>All caught up!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="profile-menu-wrap" ref={profileMenuRef}>
         <button className="avatar-btn" onClick={() => setOpen(!open)} aria-label="Open profile menu" aria-expanded={open} aria-controls="profile-menu">
           <img src={assetPath(assets.mascot)} alt="Student avatar" />
@@ -209,13 +335,23 @@ export function Topbar({ user, theme, onThemeChange, onLogout, onMenu, menuOpen,
 
 export function Shell({ children, user, theme, onThemeChange, onLogout }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [dropdownActive, setDropdownActive] = useState(false);
   const drawerRef = useRef(null);
   const drawerCloseRef = useRef(null);
   const drawerTriggerRef = useRef(null);
   const drawerTabIndex = drawerOpen ? undefined : -1;
   const location = useLocation();
 
-  useEffect(() => setDrawerOpen(false), [location.pathname]);
+  useEffect(() => {
+    setDrawerOpen(false);
+    // Focus management: scroll to top and focus main content on navigation
+    window.scrollTo(0, 0);
+    const main = document.getElementById("main-content");
+    if (main) {
+      main.scrollTo(0, 0);
+      main.focus({ preventScroll: true });
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!drawerOpen) return undefined;
@@ -262,10 +398,12 @@ export function Shell({ children, user, theme, onThemeChange, onLogout }) {
             onMenu={() => setDrawerOpen(true)}
             menuOpen={drawerOpen}
             menuButtonRef={drawerTriggerRef}
+            onDropdownOpenChange={setDropdownActive}
           />
           <main className="page-shell" id="main-content" tabIndex={-1} aria-label="Dentify page content">{children}</main>
         </div>
         <BottomNav />
+        <div className={`dropdown-backdrop ${dropdownActive ? "open" : ""}`} />
         <div className={`drawer-backdrop ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen(false)} />
         <aside className={`mobile-drawer ${drawerOpen ? "open" : ""}`} id="mobile-drawer" ref={drawerRef} aria-label="Mobile navigation" aria-hidden={drawerOpen ? undefined : "true"} aria-modal={drawerOpen ? "true" : undefined} role="dialog">
           <div className="drawer-head">

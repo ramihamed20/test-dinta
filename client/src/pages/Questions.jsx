@@ -13,6 +13,7 @@ export default function Questions() {
   const query = new URLSearchParams(useLocation().search);
   const materialId = query.get("materialId") || "";
   const difficulty = query.get("difficulty") || "";
+  const searchText = query.get("search") || "";
   const [selected, setSelected] = useState({});
   const [feedback, setFeedback] = useState({});
   const [mode, setMode] = useState("bank");
@@ -125,11 +126,25 @@ export default function Questions() {
 
   if (loading) return <LoadingPanel />;
   if (error) return <ErrorPanel message={error} />;
-  const plannedSessionCount = sessionCount === "all" ? data.length : Math.min(Number(sessionCount), data.length);
+
+  // Filter by search text from topbar
+  const filteredData = searchText
+    ? data.filter((q) => {
+        const term = searchText.toLowerCase();
+        return (
+          (q.text || "").toLowerCase().includes(term) ||
+          (q.choices || []).some((c) => (c.text || "").toLowerCase().includes(term)) ||
+          (q.explanation || "").toLowerCase().includes(term)
+        );
+      })
+    : data;
+
+  const plannedSessionCount = sessionCount === "all" ? filteredData.length : Math.min(Number(sessionCount), filteredData.length);
   const activeMaterial = (materials || []).find((material) => String(material.id) === String(materialId));
   const activeFilters = [
     activeMaterial?.title,
-    difficulty && `${difficulty} level`
+    difficulty && `${difficulty} level`,
+    searchText && `"${searchText}"`
   ].filter(Boolean);
 
   if (mode === "flashcards") {
@@ -157,12 +172,12 @@ export default function Questions() {
 
   return (
     <Page title="Questions" subtitle="Practice with answer feedback and review capture.">
-      {(materialId || difficulty) && (
+      {(materialId || difficulty || searchText) && (
         <section className="question-context" aria-label="Active question filters">
           <div>
             <Link className="back-link" to="/questions"><Icon name="chevron-left" size={16} /> All questions</Link>
             <h2>{activeFilters.join(" · ")}</h2>
-            <p>{data.length} matching {data.length === 1 ? "question" : "questions"} ready for practice.</p>
+            <p>{filteredData.length} matching {filteredData.length === 1 ? "question" : "questions"} ready for practice.</p>
           </div>
           <Link className="btn btn-soft" to="/questions"><Icon name="x" size={16} /> Clear filters</Link>
         </section>
@@ -176,12 +191,12 @@ export default function Questions() {
             </button>
           ))}
         </div>
-        <button className="mode-card" onClick={startSession} disabled={!data.length}>
+        <button className="mode-card" onClick={startSession} disabled={!filteredData.length}>
           <span className="stat-icon"><Icon name="target" /></span>
           <strong>Focused session</strong>
           <small>{plannedSessionCount} questions, one card at a time</small>
         </button>
-        <button className="mode-card" onClick={() => setMode("flashcards")} disabled={!data.length}>
+        <button className="mode-card" onClick={() => setMode("flashcards")} disabled={!filteredData.length}>
           <span className="stat-icon"><Icon name="layers" /></span>
           <strong>Flashcards</strong>
           <small>Flip question, answer, and explanation</small>
@@ -201,9 +216,10 @@ export default function Questions() {
         ))}
       </div>
       <section className="question-grid">
-        {data.map((question) => (
+        {filteredData.map((question) => (
           <QuestionCard key={question.id} question={question} selected={selected[question.id]} feedback={feedback[question.id]} onAnswer={answer} onBookmark={bookmark} />
         ))}
+        {filteredData.length === 0 && <EmptyState title="No matches" text={searchText ? `No questions match "${searchText}".` : "No questions match your current filters."} />}
       </section>
     </Page>
   );

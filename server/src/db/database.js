@@ -116,6 +116,14 @@ export function migrate() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS community_likes (
+      user_id INTEGER NOT NULL,
+      post_id INTEGER NOT NULL,
+      PRIMARY KEY(user_id, post_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS leaderboard_entries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       scope TEXT NOT NULL,

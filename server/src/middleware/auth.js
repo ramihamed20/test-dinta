@@ -3,6 +3,10 @@ import { db, toUser } from "../db/database.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dentify-dev-secret-change-me";
 
+if (JWT_SECRET === "dentify-dev-secret-change-me") {
+  console.warn("\n⚠️  WARNING: Using default JWT secret. Set JWT_SECRET in your .env for production!\n");
+}
+
 export function signToken(user) {
   return jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: "7d" });
 }

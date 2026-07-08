@@ -65,8 +65,13 @@ function App() {
   useEffect(() => {
     if (!themeSettings.autoTheme) return undefined;
     setThemeClock(new Date());
-    const timer = window.setInterval(() => setThemeClock(new Date()), 60000);
-    return () => window.clearInterval(timer);
+    let timer = null;
+    function start() { timer = window.setInterval(() => setThemeClock(new Date()), 60000); }
+    function stop() { if (timer) { window.clearInterval(timer); timer = null; } }
+    function onVisibility() { document.hidden ? stop() : start(); }
+    start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { stop(); document.removeEventListener("visibilitychange", onVisibility); };
   }, [themeSettings.autoTheme]);
 
   useEffect(() => {
@@ -78,8 +83,13 @@ function App() {
   }, [user?.email, reminderSettings]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setReminderClock(new Date()), 60000);
-    return () => window.clearInterval(timer);
+    let timer = null;
+    function start() { timer = window.setInterval(() => setReminderClock(new Date()), 60000); }
+    function stop() { if (timer) { window.clearInterval(timer); timer = null; } }
+    function onVisibility() { document.hidden ? stop() : start(); }
+    start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { stop(); document.removeEventListener("visibilitychange", onVisibility); };
   }, []);
 
   useEffect(() => {
@@ -152,7 +162,7 @@ function App() {
             <Route path="/bookmarks" element={<Bookmarks />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/achievements" element={<Achievements />} />
-            <Route path="/profile" element={<Profile user={user} />} />
+            <Route path="/profile" element={<Profile user={user} onUserUpdate={setUser} />} />
             <Route path="/settings" element={<Settings settings={themeSettings} activeTheme={activeTheme} reminderSettings={reminderSettings} onReminderSettingsChange={setReminderSettings} onSettingsChange={updateThemeSettings} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

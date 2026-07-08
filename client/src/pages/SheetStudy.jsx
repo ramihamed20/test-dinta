@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { Icon } from "../lib/icons.jsx";
-import { Page, LoadingPanel, ErrorPanel, ProgressLine, BreadcrumbBar } from "../components/ui/index.jsx";
+import { Page, LoadingPanel, ErrorPanel, ProgressLine } from "../components/ui/index.jsx";
 
 export default function SheetStudy() {
   const { materialId, sheetId } = useParams();
+  const navigate = useNavigate();
   const [session, setSession] = useState(null);
   const [modeStep, setModeStep] = useState("choose");
   const [difficulty, setDifficulty] = useState("");
@@ -15,6 +16,8 @@ export default function SheetStudy() {
   const [variant, setVariant] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [fullscreenPdf, setFullscreenPdf] = useState(false);
+  const [drawings, setDrawings] = useState({});
 
   async function startNormal() {
     await runAction(async () => {
@@ -106,7 +109,6 @@ export default function SheetStudy() {
   if (modeStep === "choose") {
     return (
       <Page title="Study Mode" subtitle="Select how you want to open this sheet. Advanced Study unlocks only 3 pages at a time.">
-        <BreadcrumbBar items={[["Materials", "/materials"], ["Sheets", `/materials/${materialId}`]]} current="Study mode" />
         <section className="study-mode-grid">
           <button className="study-mode-card" onClick={startNormal} disabled={busy}>
             <span className="stat-icon"><Icon name="book-open" /></span>
@@ -127,7 +129,6 @@ export default function SheetStudy() {
   if (modeStep === "difficulty") {
     return (
       <Page title="Advanced Study" subtitle="Choose the difficulty for this sheet. The Final Boss will use the same difficulty.">
-        <BreadcrumbBar items={[["Materials", "/materials"], ["Sheets", `/materials/${materialId}`], ["Study mode", `/materials/${materialId}/sheets/${sheetId}`]]} current="Advanced" />
         <section className="difficulty-grid">
           {["easy", "medium", "hard"].map((level) => (
             <button className={`difficulty-card ${level}`} key={level} onClick={() => startAdvanced(level)} disabled={busy}>
@@ -142,14 +143,43 @@ export default function SheetStudy() {
     );
   }
 
+  if (session?.mode === "normal") {
+    return (
+      <PdfWorkspace 
+        title={session.sheet.title} 
+        subtitle="Normal Study Mode" 
+        pdfUrl="/test.pdf" 
+        drawings={drawings}
+        setDrawings={setDrawings}
+        onClose={() => navigate(`/materials/${materialId}`)} 
+      />
+    );
+  }
+
   return (
     <Page title={session?.sheet?.title || "Sheet"} subtitle={session?.mode === "normal" ? "Normal Study mode" : "Advanced Study mode"}>
-      <BreadcrumbBar items={[["Materials", "/materials"], ["Sheets", `/materials/${materialId}`], ["Study mode", `/materials/${materialId}/sheets/${sheetId}`]]} current={session?.sheet?.title || "Sheet"} />
       {error && <ErrorPanel message={error} />}
-      {session?.mode === "normal" && <SheetReader session={session} />}
       {session?.mode === "advanced" && (
         <>
-          <AdvancedStudyPanel session={session} onQuiz={() => loadQuiz(false)} onFinal={() => loadQuiz(true)} busy={busy} />
+          <AdvancedStudyPanel 
+            session={session} 
+            drawings={drawings}
+            setDrawings={setDrawings}
+            onQuiz={() => loadQuiz(false)} 
+            onFinal={() => loadQuiz(true)} 
+            onFullscreen={() => setFullscreenPdf(true)}
+            busy={busy} 
+          />
+          {fullscreenPdf && (
+            <PdfWorkspace 
+              title={session.sheet.title} 
+              subtitle={`Advanced Study - Pages ${session.block.pageStart}-${session.block.pageEnd}`} 
+              pdfUrl="/test.pdf" 
+              drawings={drawings}
+              setDrawings={setDrawings}
+              onClose={() => setFullscreenPdf(false)} 
+            />
+          )}
           {quiz && <QuizPanel quiz={quiz} answers={answers} setAnswers={setAnswers} onSubmit={submitQuiz} busy={busy} />}
           {result && (
             <QuizResultPanel
@@ -169,15 +199,7 @@ export default function SheetStudy() {
   );
 }
 
-function SheetReader({ session }) {
-  return (
-    <section className="sheet-reader">
-      {session.pages.map((page) => <SheetPage key={page.page} page={page} />)}
-    </section>
-  );
-}
-
-function AdvancedStudyPanel({ session, onQuiz, onFinal, busy }) {
+function AdvancedStudyPanel({ session, drawings, setDrawings, onQuiz, onFinal, onFullscreen, busy }) {
   const { progress, block } = session;
   return (
     <section className="advanced-layout">
@@ -194,9 +216,15 @@ function AdvancedStudyPanel({ session, onQuiz, onFinal, busy }) {
           <small>{progress.unlockedPages}/{progress.totalPages} pages unlocked</small>
         </div>
       </article>
-      <section className="sheet-reader compact">
-        {session.pages.map((page) => <SheetPage key={page.page} page={page} />)}
-      </section>
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 700 }}>Study Material</h3>
+          <button className="btn btn-soft compact" onClick={onFullscreen} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <Icon name="expand" size={14} /> Focus Mode
+          </button>
+        </div>
+        <PdfCanvasViewer pdfUrl="/test.pdf" drawings={drawings} setDrawings={setDrawings} enableDrawing={false} />
+      </div>
       <article className="advanced-actions">
         {session.weakPoints.length > 0 && (
           <div className="needs-review-list">
@@ -283,5 +311,531 @@ function QuizResultPanel({ result, onNext, onContinue, onRetake, busy }) {
         {(result.canContinue || result.mustRetake || result.isFinal) && <button className="btn btn-soft" onClick={onRetake} disabled={busy}>Retake with new placeholders</button>}
       </div>
     </section>
+  );
+}
+
+function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose }) {
+  const [activeTool, setActiveTool] = useState("none"); // "none" (scroll), "pen", "highlighter", "eraser"
+  const [activeColor, setActiveColor] = useState("yellow"); // "yellow", "green", "pink", "blue", "red"
+  const [brushSize, setBrushSize] = useState("medium"); // "small", "medium", "large"
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [zoomScale, setZoomScale] = useState(1.2); // start slightly larger for readability
+
+  const handleClearAll = () => {
+    if (window.confirm("هل أنت متأكد من مسح جميع الرسومات في هذا المستند؟")) {
+      setDrawings({});
+    }
+  };
+
+  return (
+    <div className="pdf-workspace-overlay" role="dialog" aria-modal="true" aria-label="PDF Study Workspace">
+      <header className="pdf-workspace-header">
+        <button className="icon-btn" onClick={onClose} aria-label="Close PDF viewer">
+          <Icon name="arrow-left" size={20} />
+        </button>
+        <div className="pdf-workspace-title">
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+        <div className="pdf-workspace-actions">
+          {/* Zoom controls inside the header */}
+          <div className="zoom-controls" style={{ display: "flex", alignItems: "center", gap: "8px", marginRight: "16px", background: "var(--bg)", borderRadius: "8px", padding: "4px 8px", border: "1px solid var(--border)" }}>
+            <button className="icon-btn" onClick={() => setZoomScale(z => Math.max(0.8, z - 0.1))} title="تصغير">
+              <Icon name="minus" size={16} />
+            </button>
+            <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, minWidth: "48px", textAlign: "center", color: "var(--text-primary)" }}>
+              {Math.round(zoomScale * 100)}%
+            </span>
+            <button className="icon-btn" onClick={() => setZoomScale(z => Math.min(3.0, z + 0.1))} title="تكبير">
+              <Icon name="plus" size={16} />
+            </button>
+          </div>
+          <button className="btn btn-primary" onClick={onClose}>Done Studying</button>
+        </div>
+      </header>
+
+      {/* Floating Toolbar Sidebar */}
+      <aside className={`pdf-study-sidebar ${isSidebarOpen ? "open" : ""}`}>
+        <button 
+          className="sidebar-toggle-tab" 
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          aria-label={isSidebarOpen ? "Collapse toolbar" : "Expand toolbar"}
+          title={isSidebarOpen ? "إخفاء شريط الأدوات" : "إظهار شريط الأدوات"}
+        >
+          <Icon name={isSidebarOpen ? "chevron-left" : "chevron-right"} size={16} />
+        </button>
+        <div className="sidebar-section">
+          <span className="sidebar-section-title">الأدوات</span>
+          <button 
+            className={`tool-button ${activeTool === "none" ? "active" : ""}`} 
+            onClick={() => setActiveTool("none")}
+            title="تصفح وتمرير الصفحة"
+          >
+            <Icon name="hand" size={18} />
+            <span>تمرير</span>
+          </button>
+          <button 
+            className={`tool-button ${activeTool === "pen" ? "active" : ""}`} 
+            onClick={() => setActiveTool("pen")}
+            title="قلم كتابة ورسم"
+          >
+            <Icon name="pencil" size={18} />
+            <span>قلم</span>
+          </button>
+          <button 
+            className={`tool-button ${activeTool === "highlighter" ? "active" : ""}`} 
+            onClick={() => setActiveTool("highlighter")}
+            title="تحديد وإضاءة نصوص"
+          >
+            <Icon name="highlighter" size={18} />
+            <span>تحديد</span>
+          </button>
+          <button 
+            className={`tool-button ${activeTool === "eraser" ? "active" : ""}`} 
+            onClick={() => setActiveTool("eraser")}
+            title="ممحاة الرسومات"
+          >
+            <Icon name="eraser" size={18} />
+            <span>ممحاة</span>
+          </button>
+        </div>
+
+        {(activeTool === "pen" || activeTool === "highlighter") && (
+          <div className="sidebar-section">
+            <span className="sidebar-section-title">الألوان</span>
+            <div className="color-palette">
+              {["yellow", "green", "pink", "blue", "red"].map((color) => (
+                <button
+                  key={color}
+                  className={`color-dot ${color} ${activeColor === color ? "active" : ""}`}
+                  onClick={() => setActiveColor(color)}
+                  title={color}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTool !== "none" && (
+          <div className="sidebar-section">
+            <span className="sidebar-section-title">الحجم</span>
+            <div className="size-selector">
+              {["small", "medium", "large"].map((size) => (
+                <button
+                  key={size}
+                  className={`size-button ${brushSize === size ? "active" : ""}`}
+                  onClick={() => setBrushSize(size)}
+                >
+                  {size === "small" ? "صغير" : size === "medium" ? "وسط" : "كبير"}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="sidebar-section" style={{ marginTop: "auto", borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
+          <button className="tool-button danger" onClick={handleClearAll} title="مسح الكل">
+            <Icon name="trash" size={18} />
+            <span>مسح الكل</span>
+          </button>
+        </div>
+      </aside>
+
+      <PdfCanvasViewer 
+        pdfUrl={pdfUrl} 
+        drawings={drawings} 
+        setDrawings={setDrawings}
+        activeTool={activeTool}
+        activeColor={activeColor}
+        brushSize={brushSize}
+        enableDrawing={true}
+        zoomScale={zoomScale}
+        setZoomScale={setZoomScale}
+      />
+    </div>
+  );
+}
+
+function usePdfJs() {
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (window.pdfjsLib) {
+      setLoaded(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js";
+    script.async = true;
+    script.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
+      setLoaded(true);
+    };
+    document.body.appendChild(script);
+  }, []);
+
+  return loaded;
+}
+
+function PdfCanvasViewer({ 
+  pdfUrl, 
+  drawings, 
+  setDrawings, 
+  activeTool = "none", 
+  activeColor = "yellow", 
+  brushSize = "medium",
+  enableDrawing = true,
+  zoomScale = 1,
+  setZoomScale = () => {}
+}) {
+  const isPdfJsLoaded = usePdfJs();
+  const [pdf, setPdf] = useState(null);
+  const [numPages, setNumPages] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  
+  const containerRef = useRef(null);
+  const touchStateRef = useRef({ initialDistance: 0, initialZoom: 1 });
+
+  // Dynamically attach touch listeners to handle multi-touch zooming correctly on iPad OS Safari
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !enableDrawing) return;
+
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        touchStateRef.current.initialDistance = Math.sqrt(dx * dx + dy * dy);
+        touchStateRef.current.initialZoom = zoomScale;
+      }
+    };
+
+    const onTouchMove = (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault(); // Prevents default iPadOS full viewport scaling
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        const factor = distance / touchStateRef.current.initialDistance;
+        let newZoom = touchStateRef.current.initialZoom * factor;
+        
+        newZoom = Math.max(0.8, Math.min(3.0, newZoom));
+        setZoomScale(newZoom);
+      }
+    };
+
+    container.addEventListener("touchstart", onTouchStart, { passive: true });
+    container.addEventListener("touchmove", onTouchMove, { passive: false });
+
+    return () => {
+      container.removeEventListener("touchstart", onTouchStart);
+      container.removeEventListener("touchmove", onTouchMove);
+    };
+  }, [zoomScale, setZoomScale, enableDrawing]);
+
+  useEffect(() => {
+    if (!isPdfJsLoaded) return;
+    setLoading(true);
+    setError("");
+
+    const loadingTask = window.pdfjsLib.getDocument(pdfUrl);
+    loadingTask.promise.then(
+      (loadedPdf) => {
+        setPdf(loadedPdf);
+        setNumPages(loadedPdf.numPages);
+        setLoading(false);
+      },
+      (err) => {
+        console.error(err);
+        setError("فشل تحميل ملف الـ PDF. يرجى التأكد من اتصال الإنترنت ووجود الملف.");
+        setLoading(false);
+      }
+    );
+  }, [pdfUrl, isPdfJsLoaded]);
+
+  return (
+    <div className="pdf-canvas-viewer-container" ref={containerRef}>
+      {loading && <div className="pdf-viewer-loading">جاري تحميل ملف الـ PDF...</div>}
+      {error && <div className="pdf-viewer-error">{error}</div>}
+      {!loading && !error && pdf && (
+        <div className="pdf-canvas-pages-list" style={{ zoom: zoomScale }}>
+          {Array.from({ length: numPages }, (_, index) => {
+            const pageNum = index + 1;
+            return (
+              <PdfPageRenderer 
+                key={pageNum} 
+                pdf={pdf} 
+                pageNumber={pageNum} 
+                strokes={drawings[pageNum] || []}
+                onSaveStrokes={(newStrokes) => setDrawings(prev => ({ ...prev, [pageNum]: newStrokes }))}
+                activeTool={activeTool}
+                activeColor={activeColor}
+                brushSize={brushSize}
+                enableDrawing={enableDrawing}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PdfPageRenderer({ 
+  pdf, 
+  pageNumber, 
+  strokes, 
+  onSaveStrokes, 
+  activeTool, 
+  activeColor, 
+  brushSize,
+  enableDrawing = true
+}) {
+  const canvasRef = useRef(null);
+  const drawCanvasRef = useRef(null);
+  const [rendering, setRendering] = useState(true);
+  const isDrawingRef = useRef(false);
+  const currentPointsRef = useRef([]);
+  const [dprValue, setDprValue] = useState(1);
+
+  const getPenColor = (color) => {
+    const map = {
+      yellow: "#f59e0b",
+      green: "#10b981",
+      pink: "#ec4899",
+      blue: "#3b82f6",
+      red: "#ef4444"
+    };
+    return map[color] || "#f59e0b";
+  };
+
+  const getHighlighterColor = (color) => {
+    const map = {
+      yellow: "rgba(253, 224, 71, 0.45)",
+      green: "rgba(110, 231, 183, 0.45)",
+      pink: "rgba(244, 114, 182, 0.45)",
+      blue: "rgba(147, 197, 253, 0.45)",
+      red: "rgba(252, 165, 165, 0.45)"
+    };
+    return map[color] || "rgba(253, 224, 71, 0.45)";
+  };
+
+  const getToolSize = (tool, size) => {
+    if (tool === "highlighter") {
+      const sizes = { small: 12, medium: 20, large: 32 };
+      return sizes[size] || 20;
+    } else if (tool === "eraser") {
+      const sizes = { small: 12, medium: 24, large: 44 };
+      return sizes[size] || 24;
+    } else {
+      const sizes = { small: 2.5, medium: 4.5, large: 8 };
+      return sizes[size] || 4.5;
+    }
+  };
+
+  const getCoordinates = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+    return { x: clientX, y: clientY };
+  };
+
+  useEffect(() => {
+    let renderTask = null;
+    pdf.getPage(pageNumber).then((page) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const context = canvas.getContext("2d");
+      const scale = 1.5;
+      const viewport = page.getViewport({ scale });
+
+      const dpr = window.devicePixelRatio || 1;
+      setDprValue(dpr);
+
+      canvas.width = viewport.width * dpr;
+      canvas.height = viewport.height * dpr;
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
+
+      context.scale(dpr, dpr);
+
+      const drawCanvas = drawCanvasRef.current;
+      if (drawCanvas) {
+        drawCanvas.width = viewport.width * dpr;
+        drawCanvas.height = viewport.height * dpr;
+        drawCanvas.style.width = `${viewport.width}px`;
+        drawCanvas.style.height = `${viewport.height}px`;
+      }
+
+      const renderContext = {
+        canvasContext: context,
+        viewport: viewport,
+      };
+
+      renderTask = page.render(renderContext);
+      renderTask.promise.then(() => {
+        setRendering(false);
+      }).catch(() => {});
+    });
+
+    return () => {
+      if (renderTask) {
+        renderTask.cancel();
+      }
+    };
+  }, [pdf, pageNumber]);
+
+  useEffect(() => {
+    const canvas = drawCanvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext("2d");
+    drawStrokes(context, strokes, dprValue);
+  }, [strokes, dprValue]);
+
+  const drawStrokes = (context, strokeList, dpr) => {
+    context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+    if (!strokeList) return;
+
+    strokeList.forEach((stroke) => {
+      if (stroke.points.length === 0) return;
+
+      context.beginPath();
+      context.lineCap = "round";
+      context.lineJoin = "round";
+
+      if (stroke.tool === "eraser") {
+        context.globalCompositeOperation = "destination-out";
+        context.lineWidth = stroke.size * dpr;
+      } else {
+        context.globalCompositeOperation = "source-over";
+        context.strokeStyle = stroke.color;
+        context.lineWidth = stroke.size * dpr;
+      }
+
+      if (stroke.points.length < 3) {
+        const firstPoint = stroke.points[0];
+        context.moveTo(firstPoint.x * dpr, firstPoint.y * dpr);
+        if (stroke.points.length === 2) {
+          const secondPoint = stroke.points[1];
+          context.lineTo(secondPoint.x * dpr, secondPoint.y * dpr);
+        }
+        context.stroke();
+        return;
+      }
+
+      // Smooth curves using quadratic Bezier curves through midpoints
+      context.moveTo(stroke.points[0].x * dpr, stroke.points[0].y * dpr);
+      
+      for (let i = 1; i < stroke.points.length - 1; i++) {
+        const xc = (stroke.points[i].x + stroke.points[i + 1].x) / 2;
+        const yc = (stroke.points[i].y + stroke.points[i + 1].y) / 2;
+        context.quadraticCurveTo(
+          stroke.points[i].x * dpr, 
+          stroke.points[i].y * dpr, 
+          xc * dpr, 
+          yc * dpr
+        );
+      }
+
+      context.lineTo(
+        stroke.points[stroke.points.length - 1].x * dpr, 
+        stroke.points[stroke.points.length - 1].y * dpr
+      );
+      context.stroke();
+    });
+
+    context.globalCompositeOperation = "source-over";
+  };
+
+  const handlePointerDown = (e) => {
+    if (activeTool === "none") return;
+    
+    e.preventDefault();
+    e.target.setPointerCapture(e.pointerId);
+
+    const canvas = drawCanvasRef.current;
+    const point = getCoordinates(e, canvas);
+
+    isDrawingRef.current = true;
+    currentPointsRef.current = [point];
+
+    const context = canvas.getContext("2d");
+    const activeStroke = {
+      tool: activeTool,
+      color: activeTool === "highlighter" ? getHighlighterColor(activeColor) : getPenColor(activeColor),
+      size: getToolSize(activeTool, brushSize),
+      points: currentPointsRef.current
+    };
+    
+    drawStrokes(context, [...strokes, activeStroke], dprValue);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isDrawingRef.current) return;
+    
+    e.preventDefault();
+
+    const canvas = drawCanvasRef.current;
+    const point = getCoordinates(e, canvas);
+
+    currentPointsRef.current.push(point);
+
+    const context = canvas.getContext("2d");
+    const activeStroke = {
+      tool: activeTool,
+      color: activeTool === "highlighter" ? getHighlighterColor(activeColor) : getPenColor(activeColor),
+      size: getToolSize(activeTool, brushSize),
+      points: currentPointsRef.current
+    };
+    
+    drawStrokes(context, [...strokes, activeStroke], dprValue);
+  };
+
+  const handlePointerUp = (e) => {
+    if (!isDrawingRef.current) return;
+    
+    e.preventDefault();
+    e.target.releasePointerCapture(e.pointerId);
+
+    isDrawingRef.current = false;
+
+    const finalStroke = {
+      tool: activeTool,
+      color: activeTool === "highlighter" ? getHighlighterColor(activeColor) : getPenColor(activeColor),
+      size: getToolSize(activeTool, brushSize),
+      points: [...currentPointsRef.current]
+    };
+    
+    onSaveStrokes([...strokes, finalStroke]);
+    currentPointsRef.current = [];
+  };
+
+  return (
+    <div className="pdf-page-wrapper">
+      <span className="pdf-page-number">الصفحة {pageNumber}</span>
+      <div className="pdf-canvas-container" style={{ position: "relative" }}>
+        <canvas ref={canvasRef} />
+        {enableDrawing && (
+          <canvas 
+            ref={drawCanvasRef} 
+            className="pdf-draw-canvas"
+            style={{ 
+              position: "absolute", 
+              inset: 0, 
+              zIndex: 5, 
+              cursor: activeTool === "none" ? "default" : "crosshair",
+              touchAction: activeTool === "none" ? "auto" : "none"
+            }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+          />
+        )}
+      </div>
+      {rendering && <div className="pdf-page-spinner" />}
+    </div>
   );
 }

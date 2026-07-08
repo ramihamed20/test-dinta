@@ -19,7 +19,7 @@ import {
   Home,
   Layers,
   LockKeyhole,
-  LogOut,
+ LogOut,
   Megaphone,
   Medal,
   Menu,
@@ -38,10 +38,24 @@ import {
   Target,
   Trophy,
   User,
-  X
+  X,
+  ArrowLeft,
+  Maximize2,
+  Highlighter,
+  Eraser,
+  Hand,
+  Trash2,
+  Minus
 } from "lucide-react";
 
 const icons = {
+  minus: Minus,
+  highlighter: Highlighter,
+  eraser: Eraser,
+  hand: Hand,
+  trash: Trash2,
+  "arrow-left": ArrowLeft,
+  expand: Maximize2,
   activity: Activity,
   analytics: BarChart3,
   award: Award,
@@ -87,4 +101,3 @@ export const Icon = memo(function Icon({ name, size = 20, strokeWidth = 1.9, ...
   const Component = icons[name] || CircleHelp;
   return <Component aria-hidden="true" size={size} strokeWidth={strokeWidth} {...props} />;
 });
-

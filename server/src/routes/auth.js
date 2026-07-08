@@ -48,3 +48,31 @@ authRouter.post("/login", (req, res) => {
 authRouter.get("/me", requireAuth, (req, res) => {
   return res.json({ data: req.user });
 });
+
+authRouter.put("/profile", requireAuth, (req, res) => {
+  const { name, year } = req.body || {};
+  if (!name || name.trim().length < 2) {
+    return res.status(400).json({ error: "Name must be at least 2 characters" });
+  }
+  db.prepare("UPDATE users SET name = ?, year = ? WHERE id = ?")
+    .run(name.trim(), year || req.user.year, req.user.id);
+  const updated = toUser(db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id));
+  return res.json(updated);
+});
+
+authRouter.put("/profile/password", requireAuth, (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "Current and new password are required" });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: "New password must be at least 6 characters" });
+  }
+  const row = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+  if (!bcrypt.compareSync(currentPassword, row.password_hash)) {
+    return res.status(401).json({ error: "Current password is incorrect" });
+  }
+  const hash = bcrypt.hashSync(newPassword, 10);
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hash, req.user.id);
+  return res.json({ message: "Password updated" });
+});

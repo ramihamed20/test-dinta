@@ -4,32 +4,10 @@ import { api } from "../lib/api.js";
 import { Icon } from "../lib/icons.jsx";
 import { useAsyncData } from "../hooks/useAsyncData.js";
 import { Page, LoadingPanel, ErrorPanel, ProgressLine, MiniFeature } from "../components/ui/index.jsx";
+import { StatsGrid } from "../components/shared/StatsGrid.jsx";
 import { MaterialCard } from "./Materials.jsx";
 import { StudyHeatmap, ChartPanel, DifficultyPanel } from "./Analytics.jsx";
 
-// Import StatsGrid from Dashboard - re-export it there or inline it
-function StatsGrid({ stats }) {
-  const cards = [
-    ["Materials", stats.materialsCompleted, "file", "completed"],
-    ["Questions", stats.questionsSolved, "help", "solved"],
-    ["Accuracy", `${stats.accuracy}%`, "check", "correct"],
-    ["Due Review", stats.dueReviewCount || 0, "target", "ready"],
-    ["Saved", stats.savedItems, "bookmark", "items"]
-  ];
-  return (
-    <section className="stats-grid">
-      {cards.map(([label, value, icon, sub]) => (
-        <article className="stat-card" key={label}>
-          <span className="stat-icon"><Icon name={icon} /></span>
-          <div>
-            <strong>{value}</strong>
-            <p>{label}<small>{sub}</small></p>
-          </div>
-        </article>
-      ))}
-    </section>
-  );
-}
 
 export default function Progress() {
   const { loading, error, data } = useAsyncData(() => api("/api/progress"), []);
@@ -61,38 +39,52 @@ export default function Progress() {
       </section>
       <div className="progress-tabs" role="tablist" aria-label="Progress sections">
         {tabs.map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            id={`progress-tab-${id}`}
+            aria-selected={tab === id}
+            aria-controls={`progress-panel-${id}`}
+            tabIndex={tab === id ? 0 : -1}
+            className={tab === id ? "active" : ""}
+            onClick={() => setTab(id)}
+          >
             {label}
           </button>
         ))}
       </div>
       {tab === "overview" && (
-        <>
+        <div id="progress-panel-overview" role="tabpanel" aria-labelledby="progress-tab-overview">
           <section className="progress-insight-grid">
             <MiniFeature title="Best material" text={topMaterial ? `${topMaterial.title} is at ${topMaterial.progress}% completion.` : "Start a material to build a lead."} icon="award" />
             <MiniFeature title="Needs attention" text={weakestMaterial ? `${weakestMaterial.title} accuracy is ${weakestMaterial.accuracy || 0}%.` : "Accuracy appears after attempts."} icon="target" />
             <MiniFeature title="Coverage" text={`${attemptedMaterials}/${data.materials.length} materials have practice attempts.`} icon="layers" />
           </section>
           <StatsGrid stats={data.stats} />
-        </>
+        </div>
       )}
       {tab === "materials" && (
-        <section className="material-grid progress-materials">
-          {data.materials.map((material) => <MaterialCard key={material.id} material={material} />)}
-        </section>
+        <div id="progress-panel-materials" role="tabpanel" aria-labelledby="progress-tab-materials">
+          <section className="material-grid progress-materials">
+            {data.materials.map((material) => <MaterialCard key={material.id} material={material} />)}
+          </section>
+        </div>
       )}
       {tab === "trends" && (
-        <section className="progress-trends-grid">
-          <StudyHeatmap solvedByDay={data.solvedByDay || []} />
-          <ChartPanel title="Material completion" rows={data.materials.map((item) => [item.title, item.progress])} />
-          <ChartPanel title="Material accuracy" rows={data.materials.map((item) => [item.title, item.accuracy || 0])} />
-          <DifficultyPanel rows={data.difficulty || []} />
-          <article className="panel progress-summary-panel">
-            <div className="panel-title"><h2>Last 28 days</h2><span><Icon name="calendar" size={16} /></span></div>
-            <strong>{recentSolved}</strong>
-            <p>questions solved across the visible study calendar.</p>
-          </article>
-        </section>
+        <div id="progress-panel-trends" role="tabpanel" aria-labelledby="progress-tab-trends">
+          <section className="progress-trends-grid">
+            <StudyHeatmap solvedByDay={data.solvedByDay || []} />
+            <ChartPanel title="Material completion" rows={data.materials.map((item) => [item.title, item.progress])} />
+            <ChartPanel title="Material accuracy" rows={data.materials.map((item) => [item.title, item.accuracy || 0])} />
+            <DifficultyPanel rows={data.difficulty || []} />
+            <article className="panel progress-summary-panel">
+              <div className="panel-title"><h2>Last 28 days</h2><span><Icon name="calendar" size={16} /></span></div>
+              <strong>{recentSolved}</strong>
+              <p>questions solved across the visible study calendar.</p>
+            </article>
+          </section>
+        </div>
       )}
     </Page>
   );

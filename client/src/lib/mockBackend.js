@@ -110,6 +110,20 @@ export async function handleMockRequest(path, options = {}) {
     return { ok: true, data: user };
   }
 
+  // PUT /api/profile
+  if (cleanPath === "/api/profile" && options.method === "PUT") {
+    const payload = JSON.parse(options.body || "{}");
+    const user = JSON.parse(localStorage.getItem("dentify.user") || "{}");
+    const updated = { ...user, name: payload.name || user.name, year: payload.year || user.year };
+    localStorage.setItem("dentify.user", JSON.stringify(updated));
+    return { ok: true, data: updated };
+  }
+
+  // PUT /api/profile/password
+  if (cleanPath === "/api/profile/password" && options.method === "PUT") {
+    return { ok: true, data: { message: "Password updated" } };
+  }
+
   // GET /api/materials
   if (cleanPath === "/api/materials") {
     const materials = getDB("materials", initialMaterials);
