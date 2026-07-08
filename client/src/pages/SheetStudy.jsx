@@ -632,6 +632,7 @@ function usePdfJs() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     if (window.pdfjsLib) {
       setLoaded(true);
       return;
@@ -640,10 +641,15 @@ function usePdfJs() {
     script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js";
     script.async = true;
     script.onload = () => {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
-      setLoaded(true);
+      if (window.pdfjsLib) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
+        if (isMounted) setLoaded(true);
+      }
     };
     document.body.appendChild(script);
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return loaded;
@@ -944,8 +950,12 @@ const PdfPageRenderer = memo(function PdfPageRenderer({
   };
 
   useEffect(() => {
+    let isCancelled = false;
     let renderTask = null;
+
     pdf.getPage(pageNumber).then((page) => {
+      if (isCancelled) return;
+
       const canvas = canvasRef.current;
       if (!canvas) return;
 
@@ -978,11 +988,14 @@ const PdfPageRenderer = memo(function PdfPageRenderer({
 
       renderTask = page.render(renderContext);
       renderTask.promise.then(() => {
-        setRendering(false);
+        if (!isCancelled) {
+          setRendering(false);
+        }
       }).catch(() => {});
     });
 
     return () => {
+      isCancelled = true;
       if (renderTask) {
         renderTask.cancel();
       }
