@@ -19,7 +19,7 @@ import {
   Home,
   Layers,
   LockKeyhole,
- LogOut,
+  LogOut,
   Megaphone,
   Medal,
   Menu,
@@ -101,3 +101,4 @@ export const Icon = memo(function Icon({ name, size = 20, strokeWidth = 1.9, ...
   const Component = icons[name] || CircleHelp;
   return <Component aria-hidden="true" size={size} strokeWidth={strokeWidth} {...props} />;
 });
+

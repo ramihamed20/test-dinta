@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback, memo } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { Icon } from "../lib/icons.jsx";
@@ -320,6 +320,7 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
   const [brushSize, setBrushSize] = useState("medium"); // "small", "medium", "large"
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [zoomScale, setZoomScale] = useState(1.2); // start slightly larger for readability
+  const [stylusActive, setStylusActive] = useState(false); // true once a pen/stylus pointer is seen this session
 
   const handleClearAll = () => {
     if (window.confirm("هل أنت متأكد من مسح جميع الرسومات في هذا المستند؟")) {
@@ -364,6 +365,12 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
         >
           <Icon name={isSidebarOpen ? "chevron-left" : "chevron-right"} size={16} />
         </button>
+        {stylusActive && (
+          <div className="stylus-status-badge" role="status" title="تم اكتشاف القلم الرقمي - رفض راحة اليد مفعّل">
+            <Icon name="pencil" size={13} />
+            <span>القلم متصل - رفض اللمس مفعّل</span>
+          </div>
+        )}
         <div className="sidebar-section">
           <span className="sidebar-section-title">الأدوات</span>
           <button 
@@ -407,10 +414,14 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
               {["yellow", "green", "pink", "blue", "red"].map((color) => (
                 <button
                   key={color}
-                  className={`color-dot ${color} ${activeColor === color ? "active" : ""}`}
+                  className={`color-dot ${activeColor === color ? "active" : ""}`}
                   onClick={() => setActiveColor(color)}
                   title={color}
-                />
+                  aria-label={color}
+                  aria-pressed={activeColor === color}
+                >
+                  <span className={`color-dot-swatch ${color}`} />
+                </button>
               ))}
             </div>
           </div>
@@ -451,6 +462,7 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
         enableDrawing={true}
         zoomScale={zoomScale}
         setZoomScale={setZoomScale}
+        onStylusChange={setStylusActive}
       />
     </div>
   );
@@ -477,6 +489,10 @@ function usePdfJs() {
   return loaded;
 }
 
+// Stable empty-array reference so pages with no strokes yet don't get a fresh
+// [] identity every render (keeps React.memo on PdfPageRenderer effective).
+const EMPTY_STROKES = [];
+
 function PdfCanvasViewer({ 
   pdfUrl, 
   drawings, 
@@ -486,54 +502,175 @@ function PdfCanvasViewer({
   brushSize = "medium",
   enableDrawing = true,
   zoomScale = 1,
-  setZoomScale = () => {}
+  setZoomScale = () => {},
+  onStylusChange = () => {}
 }) {
   const isPdfJsLoaded = usePdfJs();
   const [pdf, setPdf] = useState(null);
   const [numPages, setNumPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [stylusEngaged, setStylusEngaged] = useState(false);
   
   const containerRef = useRef(null);
-  const touchStateRef = useRef({ initialDistance: 0, initialZoom: 1 });
 
-  // Dynamically attach touch listeners to handle multi-touch zooming correctly on iPad OS Safari
+  // Shared mutable gesture state, read/written by the container-level pointer
+  // listeners below and by every PdfPageRenderer's own pointer handlers.
+  // Kept as a single ref (not React state) since it needs to be mutated many
+  // times per second during a drag/pinch without triggering re-renders.
+  const gestureRef = useRef({
+    touchPointers: new Map(), // pointerId -> { x, y }
+    stylusEngaged: false, // sticky: once a pen is used, fingers never draw again this session
+    activeCancelDraw: null // set by whichever page is mid-stroke; called to abort that stroke
+  });
+
+  const panZoomRef = useRef({ active: false, startDistance: 0, startZoom: 1, midX: 0, midY: 0 });
+  const rafIdRef = useRef(null);
+  const pendingUpdateRef = useRef(null);
+
+  // The gesture listener below is attached once (not re-attached on every
+  // zoom change) for stability during an active pinch, so it reads the
+  // latest zoom off a ref rather than closing over the zoomScale prop.
+  const zoomScaleRef = useRef(zoomScale);
+  useEffect(() => {
+    zoomScaleRef.current = zoomScale;
+  }, [zoomScale]);
+
+  const flushPanZoomUpdate = () => {
+    rafIdRef.current = null;
+    const pending = pendingUpdateRef.current;
+    if (!pending) return;
+    pendingUpdateRef.current = null;
+
+    if (pending.zoom !== undefined) setZoomScale(pending.zoom);
+    const container = containerRef.current;
+    if (container && (pending.dx || pending.dy)) {
+      container.scrollLeft -= pending.dx;
+      container.scrollTop -= pending.dy;
+    }
+  };
+
+  const queuePanZoomUpdate = (zoom, dx, dy) => {
+    const prev = pendingUpdateRef.current;
+    pendingUpdateRef.current = {
+      zoom,
+      dx: (prev?.dx || 0) + dx,
+      dy: (prev?.dy || 0) + dy
+    };
+    if (rafIdRef.current == null) {
+      rafIdRef.current = requestAnimationFrame(flushPanZoomUpdate);
+    }
+  };
+
+  // Unified Pointer Events gesture layer: detects stylus vs finger input,
+  // tracks how many fingers are simultaneously touching the surface, and
+  // drives two-finger pan + pinch-zoom - all batched through rAF for smooth,
+  // lag-free scrolling even while pages are re-rendering underneath.
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !enableDrawing) return;
+    const gesture = gestureRef.current;
 
-    const onTouchStart = (e) => {
-      if (e.touches.length === 2) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        touchStateRef.current.initialDistance = Math.sqrt(dx * dx + dy * dy);
-        touchStateRef.current.initialZoom = zoomScale;
+    const onPointerDown = (e) => {
+      if (e.pointerType === "pen") {
+        // Stylus detected: sticky for the rest of the session. From this
+        // point on, finger touches are restricted to scrolling/zooming only.
+        if (!gesture.stylusEngaged) {
+          gesture.stylusEngaged = true;
+          setStylusEngaged(true);
+          onStylusChange(true);
+        }
+        // If a finger happened to be mid-stroke, abort that stroke immediately
+        // so the pen never has to fight a stray palm-drawn line.
+        if (gesture.activeCancelDraw) {
+          gesture.activeCancelDraw();
+          gesture.activeCancelDraw = null;
+        }
+        return;
+      }
+
+      if (e.pointerType !== "touch") return;
+
+      gesture.touchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (gesture.touchPointers.size === 2) {
+        // A second finger has landed: this is now a two-finger pan/zoom
+        // gesture, so cancel any single-finger stroke in progress instead of
+        // letting it turn into a stray mark.
+        if (gesture.activeCancelDraw) {
+          gesture.activeCancelDraw();
+          gesture.activeCancelDraw = null;
+        }
+        const pts = [...gesture.touchPointers.values()];
+        const dx = pts[0].x - pts[1].x;
+        const dy = pts[0].y - pts[1].y;
+        panZoomRef.current = {
+          active: true,
+          startDistance: Math.hypot(dx, dy) || 1,
+          startZoom: zoomScaleRef.current,
+          midX: (pts[0].x + pts[1].x) / 2,
+          midY: (pts[0].y + pts[1].y) / 2
+        };
       }
     };
 
-    const onTouchMove = (e) => {
-      if (e.touches.length === 2) {
-        e.preventDefault(); // Prevents default iPadOS full viewport scaling
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        const factor = distance / touchStateRef.current.initialDistance;
-        let newZoom = touchStateRef.current.initialZoom * factor;
-        
+    const onPointerMove = (e) => {
+      if (e.pointerType !== "touch") return;
+      if (!gesture.touchPointers.has(e.pointerId)) return;
+      gesture.touchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (gesture.touchPointers.size === 2 && panZoomRef.current.active) {
+        e.preventDefault(); // stop native viewport pinch/scroll; we drive it ourselves
+        const pts = [...gesture.touchPointers.values()];
+        const dx = pts[0].x - pts[1].x;
+        const dy = pts[0].y - pts[1].y;
+        const distance = Math.hypot(dx, dy);
+        const factor = distance / panZoomRef.current.startDistance;
+        let newZoom = panZoomRef.current.startZoom * factor;
         newZoom = Math.max(0.8, Math.min(3.0, newZoom));
-        setZoomScale(newZoom);
+
+        const midX = (pts[0].x + pts[1].x) / 2;
+        const midY = (pts[0].y + pts[1].y) / 2;
+        const deltaX = midX - panZoomRef.current.midX;
+        const deltaY = midY - panZoomRef.current.midY;
+        panZoomRef.current.midX = midX;
+        panZoomRef.current.midY = midY;
+
+        queuePanZoomUpdate(newZoom, deltaX, deltaY);
       }
     };
 
-    container.addEventListener("touchstart", onTouchStart, { passive: true });
-    container.addEventListener("touchmove", onTouchMove, { passive: false });
+    const endTouchPointer = (e) => {
+      if (e.pointerType !== "touch") return;
+      gesture.touchPointers.delete(e.pointerId);
+      if (gesture.touchPointers.size < 2) {
+        panZoomRef.current.active = false;
+      }
+    };
+
+    container.addEventListener("pointerdown", onPointerDown, { passive: true });
+    container.addEventListener("pointermove", onPointerMove, { passive: false });
+    container.addEventListener("pointerup", endTouchPointer, { passive: true });
+    container.addEventListener("pointercancel", endTouchPointer, { passive: true });
 
     return () => {
-      container.removeEventListener("touchstart", onTouchStart);
-      container.removeEventListener("touchmove", onTouchMove);
+      container.removeEventListener("pointerdown", onPointerDown);
+      container.removeEventListener("pointermove", onPointerMove);
+      container.removeEventListener("pointerup", endTouchPointer);
+      container.removeEventListener("pointercancel", endTouchPointer);
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
     };
-  }, [zoomScale, setZoomScale, enableDrawing]);
+    // zoomScale is read at gesture-start time only (captured into panZoomRef),
+    // so it's fine that this effect doesn't re-run on every zoom tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enableDrawing, onStylusChange]);
+
+  const handleSaveStrokes = useCallback((pageNum, newStrokes) => {
+    setDrawings((prev) => ({ ...prev, [pageNum]: newStrokes }));
+  }, [setDrawings]);
 
   useEffect(() => {
     if (!isPdfJsLoaded) return;
@@ -568,12 +705,14 @@ function PdfCanvasViewer({
                 key={pageNum} 
                 pdf={pdf} 
                 pageNumber={pageNum} 
-                strokes={drawings[pageNum] || []}
-                onSaveStrokes={(newStrokes) => setDrawings(prev => ({ ...prev, [pageNum]: newStrokes }))}
+                strokes={drawings[pageNum] || EMPTY_STROKES}
+                onSaveStrokes={handleSaveStrokes}
                 activeTool={activeTool}
                 activeColor={activeColor}
                 brushSize={brushSize}
                 enableDrawing={enableDrawing}
+                gesture={gestureRef.current}
+                stylusEngaged={stylusEngaged}
               />
             );
           })}
@@ -583,7 +722,7 @@ function PdfCanvasViewer({
   );
 }
 
-function PdfPageRenderer({ 
+const PdfPageRenderer = memo(function PdfPageRenderer({ 
   pdf, 
   pageNumber, 
   strokes, 
@@ -591,7 +730,9 @@ function PdfPageRenderer({
   activeTool, 
   activeColor, 
   brushSize,
-  enableDrawing = true
+  enableDrawing = true,
+  gesture = null,
+  stylusEngaged = false
 }) {
   const canvasRef = useRef(null);
   const drawCanvasRef = useRef(null);
@@ -750,9 +891,35 @@ function PdfPageRenderer({
     context.globalCompositeOperation = "source-over";
   };
 
+  // Discards whatever is currently being drawn without saving it. Registered
+  // with the shared gesture ref while a touch-drawn stroke is in progress so
+  // a second finger (pan/zoom) or an incoming pen touch can abort it cleanly
+  // instead of leaving a stray palm mark behind.
+  const abortActiveStroke = () => {
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+    currentPointsRef.current = [];
+    const canvas = drawCanvasRef.current;
+    if (canvas) {
+      drawStrokes(canvas.getContext("2d"), strokes, dprValue);
+    }
+  };
+
   const handlePointerDown = (e) => {
     if (activeTool === "none") return;
-    
+
+    if (e.pointerType === "pen") {
+      // Stylus input always draws, and always wins palm-rejection races.
+      if (gesture) gesture.stylusEngaged = true;
+    } else if (e.pointerType === "touch") {
+      // Flawless palm rejection: once a stylus has touched down this
+      // session, fingers are restricted to scrolling/zooming and never draw.
+      if (stylusEngaged || gesture?.stylusEngaged) return;
+      // A second finger already down means this is a two-finger pan/zoom
+      // gesture in progress, not a drawing touch - ignore it.
+      if (gesture && gesture.touchPointers.size >= 2) return;
+    }
+
     e.preventDefault();
     e.target.setPointerCapture(e.pointerId);
 
@@ -761,6 +928,10 @@ function PdfPageRenderer({
 
     isDrawingRef.current = true;
     currentPointsRef.current = [point];
+
+    if (e.pointerType === "touch" && gesture) {
+      gesture.activeCancelDraw = abortActiveStroke;
+    }
 
     const context = canvas.getContext("2d");
     const activeStroke = {
@@ -795,10 +966,15 @@ function PdfPageRenderer({
   };
 
   const handlePointerUp = (e) => {
+    if (gesture && gesture.activeCancelDraw === abortActiveStroke) {
+      gesture.activeCancelDraw = null;
+    }
     if (!isDrawingRef.current) return;
     
     e.preventDefault();
-    e.target.releasePointerCapture(e.pointerId);
+    if (e.target.hasPointerCapture?.(e.pointerId)) {
+      e.target.releasePointerCapture(e.pointerId);
+    }
 
     isDrawingRef.current = false;
 
@@ -809,8 +985,17 @@ function PdfPageRenderer({
       points: [...currentPointsRef.current]
     };
     
-    onSaveStrokes([...strokes, finalStroke]);
+    onSaveStrokes(pageNumber, [...strokes, finalStroke]);
     currentPointsRef.current = [];
+  };
+
+  // A pointer stream can be cancelled by the OS mid-stroke (e.g. the system
+  // intercepts it for a gesture). Discard rather than save a truncated line.
+  const handlePointerCancel = (e) => {
+    if (gesture && gesture.activeCancelDraw === abortActiveStroke) {
+      gesture.activeCancelDraw = null;
+    }
+    abortActiveStroke();
   };
 
   return (
@@ -827,15 +1012,19 @@ function PdfPageRenderer({
               inset: 0, 
               zIndex: 5, 
               cursor: activeTool === "none" ? "default" : "crosshair",
-              touchAction: activeTool === "none" ? "auto" : "none"
+              // Once a stylus has been used, fingers should behave exactly
+              // like "navigate" mode (native scroll/pinch) even while a
+              // drawing tool stays selected for the pen - only the pen draws.
+              touchAction: activeTool === "none" || stylusEngaged ? "auto" : "none"
             }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
           />
         )}
       </div>
       {rendering && <div className="pdf-page-spinner" />}
     </div>
   );
-}
+});

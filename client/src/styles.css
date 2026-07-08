@@ -8566,10 +8566,10 @@ body,
 /* Toggle tab attached to the sidebar right border */
 .sidebar-toggle-tab {
   position: absolute;
-  right: -28px; /* sticks out to the right of the sidebar bounds */
+  right: -44px; /* sticks out to the right of the sidebar bounds */
   top: 50%;
   transform: translateY(-50%);
-  width: 28px;
+  width: 44px; /* meets the 44x44 HIG minimum touch target */
   height: 56px;
   background: color-mix(in srgb, var(--surface-2) 90%, transparent);
   backdrop-filter: blur(20px);
@@ -8590,8 +8590,30 @@ body,
 .sidebar-toggle-tab:hover {
   color: var(--text-primary);
   background: var(--bg-hover);
-  width: 30px; /* expands slightly on hover */
-  right: -30px;
+  width: 48px; /* expands slightly on hover */
+  right: -48px;
+}
+
+/* ===== STYLUS / PALM-REJECTION STATUS BADGE ===== */
+.stylus-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+  color: var(--color-primary);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  justify-content: center;
+}
+
+.stylus-status-badge svg {
+  flex-shrink: 0;
 }
 
 .sidebar-section {
@@ -8659,29 +8681,46 @@ body,
 }
 
 .color-dot {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* The button itself is the full 44x44 hit target; this inner span is the
+   small visible dot, so the touch target grows without the palette looking
+   oversized. */
+.color-dot-swatch {
   width: 20px;
   height: 20px;
   border-radius: 50%;
   border: 2px solid transparent;
-  cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
 }
 
-.color-dot:hover {
+.color-dot:hover .color-dot-swatch {
   transform: scale(1.15);
 }
 
-.color-dot.active {
+.color-dot.active .color-dot-swatch {
   border-color: var(--text-primary);
   transform: scale(1.1);
 }
 
-.color-dot.yellow { background-color: #f59e0b; }
-.color-dot.green { background-color: #10b981; }
-.color-dot.pink { background-color: #ec4899; }
-.color-dot.blue { background-color: #3b82f6; }
-.color-dot.red { background-color: #ef4444; }
+.color-dot-swatch.yellow { background-color: #f59e0b; }
+.color-dot-swatch.green { background-color: #10b981; }
+.color-dot-swatch.pink { background-color: #ec4899; }
+.color-dot-swatch.blue { background-color: #3b82f6; }
+.color-dot-swatch.red { background-color: #ef4444; }
 
 .size-selector {
   display: flex;
@@ -8694,9 +8733,10 @@ body,
   background: var(--bg-hover);
   border: 1px solid var(--border);
   color: var(--text-2);
-  border-radius: 6px;
-  padding: 4px;
-  font-size: 9px;
+  border-radius: 8px;
+  padding: 10px 6px;
+  min-height: 44px;
+  font-size: 10px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -8713,4 +8753,135 @@ body,
   background: var(--text-primary);
   color: var(--bg);
   border-color: var(--text-primary);
+}
+
+/* ===== PDF WORKSPACE RESPONSIVENESS ===== */
+/* iPad (portrait, 768px+) and desktop keep the collapsible left sidebar
+   defined above untouched. Below 768px (phones), the toolbar becomes a
+   floating bottom sheet instead of a left-edge drawer. */
+@media (max-width: 768px) {
+  .pdf-workspace-header {
+    height: 64px;
+    padding: 0 var(--space-3);
+  }
+
+  .pdf-workspace-title h2 {
+    font-size: var(--text-sm);
+  }
+
+  .pdf-workspace-title p {
+    display: none; /* reclaim header space on narrow screens */
+  }
+
+  .pdf-workspace-actions .zoom-controls {
+    margin-right: var(--space-2) !important;
+    padding: 2px 4px !important;
+  }
+
+  .pdf-workspace-actions .btn {
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+    font-size: var(--text-xs);
+  }
+
+  .pdf-canvas-viewer-container {
+    padding: var(--space-4) var(--space-3);
+    /* leave room so the collapsed bottom sheet handle never covers content */
+    padding-bottom: calc(var(--space-8) + var(--safe-bottom));
+  }
+
+  .pdf-study-sidebar {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    max-height: min(64vh, 480px);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 20px 20px 0 0;
+    padding: 18px 16px calc(16px + var(--safe-bottom));
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 14px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 -10px 34px rgba(0, 0, 0, 0.35);
+    /* Fully collapsed, the sheet sits just off the bottom edge - only its
+       drag handle (.sidebar-toggle-tab, repositioned below) stays visible. */
+    transform: translateY(100%);
+  }
+
+  .pdf-study-sidebar.open {
+    transform: translateY(0);
+  }
+
+  /* The handle becomes a drag tab centered above the sheet, matching the
+     same "attached to the edge, peeks out when collapsed" trick used on
+     desktop - just rotated onto the vertical axis. */
+  .sidebar-toggle-tab {
+    right: auto;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 64px;
+    height: 28px;
+    border-left: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.15);
+  }
+
+  .sidebar-toggle-tab:hover {
+    width: 68px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+
+  .sidebar-toggle-tab svg {
+    transform: rotate(90deg);
+  }
+
+  .sidebar-section {
+    width: auto;
+    flex: 1 1 130px;
+    min-width: 110px;
+  }
+
+  /* Tools row scrolls horizontally so all four tools stay reachable
+     one-handed without eating the sheet's vertical space. */
+  .sidebar-section:first-of-type {
+    flex: 1 1 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    gap: 10px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tool-button {
+    flex: 0 0 auto;
+    width: 56px;
+    height: 56px;
+  }
+
+  .color-palette {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .size-selector {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .size-button {
+    flex: 1 1 auto;
+  }
 }
