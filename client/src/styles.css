@@ -8577,32 +8577,49 @@ body,
 }
 
 .pdf-study-sidebar.dock-top {
-  top: 72px !important; /* right under header */
-  left: 50% !important;
-  transform: translateX(-50%) !important;
+  top: 72px !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 48px !important;
+  transform: none !important;
+  border-left: none !important;
+  border-right: none !important;
   border-top: none !important;
-  border-radius: 0 0 24px 24px !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  padding: 0 24px !important;
 }
 
 .pdf-study-sidebar.dock-bottom {
   top: auto !important;
   bottom: 0 !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 48px !important;
+  transform: none !important;
+  border-left: none !important;
+  border-right: none !important;
   border-bottom: none !important;
-  border-radius: 24px 24px 0 0 !important;
+  border-top: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  padding: 0 24px !important;
 }
 
 /* For horizontal top/bottom docks, override flex direction to keep elements inline */
 .pdf-study-sidebar.dock-top,
 .pdf-study-sidebar.dock-bottom {
   flex-direction: row !important;
+  align-items: center !important;
 }
 
 .pdf-study-sidebar.dock-top .sidebar-columns-wrapper,
 .pdf-study-sidebar.dock-bottom .sidebar-columns-wrapper {
   flex-direction: row !important;
   align-items: center !important;
+  width: 100% !important;
+  height: 100% !important;
   gap: 0 !important;
 }
 
@@ -8610,7 +8627,36 @@ body,
 .pdf-study-sidebar.dock-bottom .sidebar-main-column {
   flex-direction: row !important;
   width: auto !important;
+  height: 100% !important;
+  align-items: center !important;
   gap: 12px !important;
+}
+
+.pdf-study-sidebar.dock-top .sidebar-main-column .sidebar-section,
+.pdf-study-sidebar.dock-bottom .sidebar-main-column .sidebar-section {
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: auto !important;
+}
+
+.pdf-study-sidebar.dock-top .sidebar-section-title,
+.pdf-study-sidebar.dock-bottom .sidebar-section-title {
+  display: none !important;
+}
+
+.pdf-study-sidebar.dock-top .tool-button,
+.pdf-study-sidebar.dock-bottom .tool-button {
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  flex-direction: row !important;
+}
+
+.pdf-study-sidebar.dock-top .tool-button span,
+.pdf-study-sidebar.dock-bottom .tool-button span {
+  display: none !important;
 }
 
 .pdf-study-sidebar.dock-top .sidebar-main-column > :last-child,
@@ -8627,6 +8673,7 @@ body,
 .pdf-study-sidebar.dock-bottom .sidebar-header-controls {
   flex-direction: row !important;
   width: auto !important;
+  align-items: center !important;
   gap: 8px !important;
 }
 
@@ -8634,8 +8681,9 @@ body,
 .pdf-study-sidebar.dock-bottom .sidebar-drag-handle {
   border-bottom: none !important;
   border-right: 1px solid var(--border) !important;
-  padding: 0 8px 0 0 !important;
+  padding: 0 10px 0 0 !important;
   width: auto !important;
+  margin-bottom: 0 !important;
 }
 
 .pdf-study-sidebar.dock-top .sidebar-drag-handle svg,
@@ -8646,17 +8694,19 @@ body,
 .pdf-study-sidebar.dock-top .sidebar-collapse-trigger,
 .pdf-study-sidebar.dock-bottom .sidebar-collapse-trigger {
   position: static !important;
-  padding: 4px !important;
+  padding: 6px !important;
 }
 
 .pdf-study-sidebar.dock-top .sidebar-shelf-column,
 .pdf-study-sidebar.dock-bottom .sidebar-shelf-column {
   flex-direction: row !important;
   width: auto !important;
+  height: 100% !important;
+  align-items: center !important;
   gap: 16px !important;
   border-left: 1px solid var(--border) !important;
   margin-left: 12px !important;
-  padding-left: 12px;
+  padding-left: 12px !important;
   animation: slide-in-shelf-horizontal 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -8681,10 +8731,32 @@ body,
   gap: 6px !important;
 }
 
+.pdf-study-sidebar.dock-top .color-dot,
+.pdf-study-sidebar.dock-bottom .color-dot {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+}
+
+.pdf-study-sidebar.dock-top .color-dot-swatch,
+.pdf-study-sidebar.dock-bottom .color-dot-swatch {
+  width: 16px !important;
+  height: 16px !important;
+}
+
 .pdf-study-sidebar.dock-top .size-selector,
 .pdf-study-sidebar.dock-bottom .size-selector {
   flex-direction: row !important;
   gap: 6px !important;
+}
+
+.pdf-study-sidebar.dock-top .size-button,
+.pdf-study-sidebar.dock-bottom .size-button {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
 }
 
 /* Collapsed Circular Bubble State */
