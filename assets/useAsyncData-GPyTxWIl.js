@@ -1,0 +1,1 @@
+import{r as a}from"./index-BWraFlo2.js";function u(s,o=[]){const[n,t]=a.useState({loading:!0,error:"",data:null});return a.useEffect(()=>{let r=!0;return t(e=>({...e,loading:!0,error:""})),s().then(e=>{r&&t({loading:!1,error:"",data:e})}).catch(e=>{r&&t({loading:!1,error:e.message,data:null})}),()=>{r=!1}},o),n}export{u};
