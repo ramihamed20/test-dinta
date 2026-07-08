@@ -283,14 +283,14 @@ export async function handleMockRequest(path, options = {}) {
     };
   }
 
-  // GET /api/community
+  // GET /api/community or POST /api/community/posts
   if (cleanPath === "/api/community") {
     const community = getDB("community", initialCommunity);
     return { ok: true, data: community };
   }
 
-  // POST /api/community
-  if (cleanPath === "/api/community" && options.method === "POST") {
+  // POST /api/community or /api/community/posts
+  if ((cleanPath === "/api/community" || cleanPath === "/api/community/posts") && options.method === "POST") {
     const payload = JSON.parse(options.body || "{}");
     const community = getDB("community", initialCommunity);
     const user = JSON.parse(localStorage.getItem("dentify.user") || '{"email":"demo@dentify.local","name":"Demo User"}');
@@ -313,6 +313,34 @@ export async function handleMockRequest(path, options = {}) {
   if (cleanPath === "/api/ranked") {
     const leaderboard = getDB("leaderboard", initialLeaderboard);
     return { ok: true, data: leaderboard };
+  }
+
+  // GET /api/achievements
+  if (cleanPath === "/api/achievements") {
+    const attempts = getDB("attempts", {});
+    const solvedCount = Object.keys(attempts).length;
+    const studyPlan = getDB("studyPlan", []);
+    const xp = getDB("xp", { level: 1, total: 320, progress: 32, title: "Dental Starter" });
+
+    const userAchievements = [
+      { id: 1, title: "Study Starter", description: "Answer your first question", icon: "book-open", threshold: 1, metric: "solved", value: solvedCount, unlocked: solvedCount >= 1, progress: solvedCount >= 1 ? 100 : 0 },
+      { id: 2, title: "Knowledge Seeker", description: "Solve 5 questions", icon: "award", threshold: 5, metric: "solved", value: solvedCount, unlocked: solvedCount >= 5, progress: Math.min(100, Math.round((solvedCount / 5) * 100)) },
+      { id: 3, title: "Consistent Learner", description: "Maintain a 3-day streak", icon: "activity", threshold: 3, metric: "streak", value: 4, unlocked: true, progress: 100 },
+      { id: 4, title: "Master Planner", description: "Create 3 study sessions", icon: "calendar", threshold: 3, metric: "study-plan", value: studyPlan.length, unlocked: studyPlan.length >= 3, progress: Math.min(100, Math.round((studyPlan.length / 3) * 100)) }
+    ];
+
+    const unlocked = userAchievements.filter(a => a.unlocked).length;
+    const total = userAchievements.length;
+    const completion = Math.round((unlocked / total) * 100);
+
+    return {
+      ok: true,
+      data: {
+        summary: { unlocked, total, completion },
+        achievements: userAchievements,
+        newlyUnlocked: []
+      }
+    };
   }
 
   // GET /api/analytics
@@ -381,6 +409,183 @@ export async function handleMockRequest(path, options = {}) {
     studyPlan.sort((a, b) => a.time.localeCompare(b.time));
     setDB("studyPlan", studyPlan);
     return { ok: true, data: newBlock };
+  }
+
+  // PUT /api/study-plan/:id
+  const editStudyPlanMatch = cleanPath.match(/\/api\/study-plan\/([\w-]+)/);
+  if (editStudyPlanMatch && options.method === "PUT") {
+    const pId = editStudyPlanMatch[1];
+    const payload = JSON.parse(options.body || "{}");
+    const studyPlan = getDB("studyPlan", []);
+    const item = studyPlan.find(p => p.id === pId);
+    if (item) {
+      item.time = payload.time || item.time;
+      item.topic = payload.topic || item.topic;
+      studyPlan.sort((a, b) => a.time.localeCompare(b.time));
+      setDB("studyPlan", studyPlan);
+      return { ok: true, data: item };
+    }
+    return { ok: false, error: "Study plan item not found" };
+  }
+
+  // DELETE /api/study-plan/:id
+  const deleteStudyPlanMatch = cleanPath.match(/\/api\/study-plan\/([\w-]+)/);
+  if (deleteStudyPlanMatch && options.method === "DELETE") {
+    const pId = deleteStudyPlanMatch[1];
+    const studyPlan = getDB("studyPlan", []);
+    const filtered = studyPlan.filter(p => p.id !== pId);
+    setDB("studyPlan", filtered);
+    return { ok: true, data: { success: true } };
+  }
+
+  // DELETE /api/bookmarks/:id
+  const deleteBookmarkMatch = cleanPath.match(/\/api\/bookmarks\/(\d+)/);
+  if (deleteBookmarkMatch && options.method === "DELETE") {
+    const bId = Number(deleteBookmarkMatch[1]);
+    const bookmarks = getDB("bookmarks", []);
+    const filtered = bookmarks.filter(b => b.id !== bId);
+    setDB("bookmarks", filtered);
+    return { ok: true, data: { success: true } };
+  }
+
+  // POST /api/sheets/:sheetId/start
+  const startSheetMatch = cleanPath.match(/\/api\/sheets\/(\d+)\/start/);
+  if (startSheetMatch && options.method === "POST") {
+    const sheetId = Number(startSheetMatch[1]);
+    const payload = JSON.parse(options.body || "{}");
+    const session = {
+      id: `session-${Date.now()}`,
+      sheetId,
+      mode: payload.mode,
+      difficulty: payload.difficulty || "Medium",
+      sheet: {
+        id: sheetId,
+        title: "Oral Anatomy Reference Sheet",
+        totalPages: 12
+      },
+      block: {
+        pageStart: 1,
+        pageEnd: payload.mode === "normal" ? 12 : 3
+      },
+      progress: {
+        unlockedPages: payload.mode === "normal" ? 12 : 3,
+        totalPages: 12
+      },
+      weakPoints: [],
+      finalAvailable: false
+    };
+    localStorage.setItem(`dentify.mock.session.${sheetId}`, JSON.stringify(session));
+    return { ok: true, data: session };
+  }
+
+  // GET /api/sheets/:sheetId/quiz
+  const getQuizMatch = cleanPath.match(/\/api\/sheets\/(\d+)\/quiz/);
+  if (getQuizMatch) {
+    const sheetId = Number(getQuizMatch[1]);
+    const isFinal = params.get("final") === "1";
+    const difficulty = params.get("difficulty") || "Medium";
+
+    const mockQuizQuestions = [
+      { id: 101, prompt: "What is the primary organic component of enamel?", choices: ["Amelogenin", "Collagen", "Water", "Hydroxyapatite"], correct: "Amelogenin", explanation: "Amelogenin makes up about 90% of the organic matrix of developing enamel.", difficulty },
+      { id: 102, prompt: "Which type of dentin is formed after root completion?", choices: ["Primary dentin", "Secondary dentin", "Tertiary dentin", "Sclerotic dentin"], correct: "Secondary dentin", explanation: "Secondary dentin is formed after root formation is complete and continues throughout life.", difficulty },
+      { id: 103, prompt: "What is the thickness of the enamel at the incisal edge of a newly erupted incisor?", choices: ["0.5 mm", "1.0 mm", "2.0 mm", "3.0 mm"], correct: "2.0 mm", explanation: "Enamel is thickest at the incisal edge (about 2.0 mm) and thinnest at the CEJ.", difficulty }
+    ];
+
+    return {
+      ok: true,
+      data: {
+        pageStart: 1,
+        pageEnd: 3,
+        isFinal,
+        variant: 0,
+        questions: mockQuizQuestions
+      }
+    };
+  }
+
+  // POST /api/sheets/:sheetId/quiz/submit
+  const submitQuizMatch = cleanPath.match(/\/api\/sheets\/(\d+)\/quiz\/submit/);
+  if (submitQuizMatch && options.method === "POST") {
+    const sheetId = Number(submitQuizMatch[1]);
+    const payload = JSON.parse(options.body || "{}");
+    const answers = payload.answers || [];
+
+    const correctAnswers = {
+      101: "Amelogenin",
+      102: "Secondary dentin",
+      103: "2.0 mm"
+    };
+
+    let correctCount = 0;
+    const wrongQuestions = [];
+    answers.forEach(ans => {
+      if (correctAnswers[ans.questionId] === ans.selectedAnswer) {
+        correctCount++;
+      } else {
+        wrongQuestions.push({
+          id: ans.questionId,
+          topic: ans.questionId === 101 ? "Enamel Matrix" : ans.questionId === 102 ? "Dentin Types" : "Enamel Thickness",
+          wrongCount: 1
+        });
+      }
+    });
+
+    const accuracy = Math.round((correctCount / answers.length) * 100);
+    const result = {
+      sheetId,
+      pageStart: payload.pageStart,
+      pageEnd: payload.pageEnd,
+      correctCount,
+      totalCount: answers.length,
+      accuracy,
+      weakPoints: wrongQuestions,
+      finalAvailable: payload.pageEnd >= 12
+    };
+
+    const xp = getDB("xp", { level: 1, total: 320, progress: 32, title: "Dental Starter" });
+    xp.total += correctCount * 30 + 50;
+    xp.level = Math.floor(xp.total / 1000) + 1;
+    xp.progress = Math.round((xp.total % 1000) / 10);
+    xp.remaining = 1000 - (xp.total % 1000);
+    setDB("xp", xp);
+
+    return { ok: true, data: result };
+  }
+
+  // POST /api/sheets/:sheetId/advanced/continue
+  const continueAdvancedMatch = cleanPath.match(/\/api\/sheets\/(\d+)\/advanced\/continue/);
+  if (continueAdvancedMatch && options.method === "POST") {
+    const sheetId = Number(continueAdvancedMatch[1]);
+    const payload = JSON.parse(options.body || "{}");
+    const pageEnd = Number(payload.pageEnd || 3);
+
+    const nextStart = pageEnd + 1;
+    const nextEnd = Math.min(12, nextStart + 2);
+
+    const session = {
+      id: `session-${Date.now()}`,
+      sheetId,
+      mode: "advanced",
+      difficulty: payload.difficulty || "Medium",
+      sheet: {
+        id: sheetId,
+        title: "Oral Anatomy Reference Sheet",
+        totalPages: 12
+      },
+      block: {
+        pageStart: nextStart,
+        pageEnd: nextEnd
+      },
+      progress: {
+        unlockedPages: nextEnd,
+        totalPages: 12
+      },
+      weakPoints: [],
+      finalAvailable: nextEnd >= 12
+    };
+
+    localStorage.setItem(`dentify.mock.session.${sheetId}`, JSON.stringify(session));
+    return { ok: true, data: session };
   }
 
   // PUT /api/settings/theme
