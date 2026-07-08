@@ -3,10 +3,7 @@ import { handleMockRequest } from "./mockBackend.js";
 const API_URL = import.meta.env.VITE_API_URL || "";
 const TOKEN_KEY = "dentify.token";
 
-const isDevServer = 
-  window.location.hostname === "localhost" || 
-  window.location.hostname === "127.0.0.1" || 
-  window.location.hostname.startsWith("192.168.");
+const isDevServer = import.meta.env.DEV;
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);

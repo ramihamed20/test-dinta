@@ -638,11 +638,11 @@ function usePdfJs() {
       return;
     }
     const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js";
+    script.src = "/pdf.min.js";
     script.async = true;
     script.onload = () => {
       if (window.pdfjsLib) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
         if (isMounted) setLoaded(true);
       }
     };
