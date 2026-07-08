@@ -77,9 +77,6 @@ export default function Community() {
         </article>
         <aside className="community-rail">
           <StudyBuddyCard buddy={data.buddy} />
-          <MiniFeature title="Questions & Discussions" text="Threaded questions for unclear topics." icon="help" />
-          <MiniFeature title="Important Alerts" text="Pinned academic alerts and deadlines." icon="bell" />
-          <MiniFeature title="Saved Posts" text="Community posts can be collected for later review." icon="bookmark" />
         </aside>
       </section>
     </Page>

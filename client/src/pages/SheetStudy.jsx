@@ -329,6 +329,7 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const dragStartPos = useRef({ x: 0, y: 0 });
   const hasDragged = useRef(false);
+  const sidebarRef = useRef(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -386,7 +387,10 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
     newX = Math.max(10, Math.min(window.innerWidth - sidebarWidth - 10, newX));
     newY = Math.max(80, Math.min(window.innerHeight - sidebarHeight - 10, newY));
     
-    setToolbarPosition({ x: newX, y: newY });
+    if (sidebarRef.current) {
+      sidebarRef.current.style.left = `${newX}px`;
+      sidebarRef.current.style.top = `${newY}px`;
+    }
   };
 
   const handleDragEnd = (e) => {
@@ -420,6 +424,7 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
     }
 
     setDockPosition(newDock);
+    setToolbarPosition({ x: finalX, y: finalY });
   };
 
   return (
@@ -451,6 +456,7 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
 
       {/* Floating Toolbar Sidebar */}
       <aside 
+        ref={sidebarRef}
         className={`pdf-study-sidebar ${isSidebarOpen ? "open" : "collapsed"} ${
           isDraggingRef.current ? "dock-floating" : `dock-${dockPosition}`
         }`}

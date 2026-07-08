@@ -23,11 +23,6 @@ export default function Ranked() {
           <p>{data.currentUser.percentile} - {data.currentUser.points.toLocaleString()} pts</p>
         </div>
       </section>
-      <section className="ranked-summary-grid">
-        <MiniFeature title="Monthly Champion" text={`${data.monthlyChampion?.name || "Nour H."} leads the monthly board.`} icon="award" />
-        <MiniFeature title="Material Ranking" text="Separate ranking per dental material." icon="analytics" />
-        <MiniFeature title="Top Solvers" text="Students ranked by solved question volume." icon="help" />
-      </section>
       <section className="leaderboard-grid">
         <Leaderboard title="Batch Ranking" entries={data.groups.weekly || []} icon="trophy" />
         <Leaderboard title="Top Solvers" entries={data.groups.solver || []} icon="medal" />

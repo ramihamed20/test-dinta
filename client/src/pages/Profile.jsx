@@ -67,50 +67,89 @@ export default function Profile({ user, onUserUpdate }) {
   return (
     <Page title="My Profile" subtitle="Manage your identity, study stats, and account settings.">
       <section className="profile-grid">
-        <article className="panel profile-card">
-          <div className="profile-avatar-wrap">
-            <img src={assetPath(assets.mascot)} alt="Student avatar" />
-            <div className="profile-level-badge">
-              <span>LVL</span>
-              <strong>{xp.level}</strong>
+        <article className="panel profile-card student-id-card">
+          <div className="id-card-header">
+            <div className="id-card-logo">
+              <Icon name="award" size={18} />
+              <span>DENTIFY ACADEMY</span>
             </div>
+            <span className="id-card-chip" />
           </div>
-          {editing ? (
-            <form onSubmit={saveProfile} className="profile-edit-form">
-              <label className="field">
-                <span>Display Name</span>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                  minLength={2}
-                />
-              </label>
-              <label className="field">
-                <span>Academic Year</span>
-                <select value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })}>
-                  {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
-                </select>
-              </label>
-              {error && <p className="form-alert error">{error}</p>}
-              <div className="profile-edit-actions">
-                <button className="btn btn-primary" type="submit" disabled={saving}>
-                  {saving ? "Saving..." : "Save changes"}
-                </button>
-                <button className="btn btn-soft" type="button" onClick={() => setEditing(false)}>Cancel</button>
+          <div className="id-card-body">
+            <div className="profile-avatar-wrap">
+              <img src={assetPath(assets.mascot)} alt="Student avatar" />
+              <div className="profile-level-badge">
+                <span>LVL</span>
+                <strong>{xp.level}</strong>
               </div>
-            </form>
-          ) : (
-            <>
-              <h2>{user.name}</h2>
-              <p>{user.email}</p>
-              <span className="pill">{user.year || "3rd Year"}</span>
-              <button className="btn btn-soft" onClick={() => setEditing(true)}>
-                <Icon name="settings" size={16} /> Edit profile
-              </button>
-            </>
-          )}
+            </div>
+            {editing ? (
+              <form onSubmit={saveProfile} className="profile-edit-form">
+                <label className="field">
+                  <span>Display Name</span>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    required
+                    minLength={2}
+                  />
+                </label>
+                <label className="field">
+                  <span>Academic Year</span>
+                  <select value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })}>
+                    {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </label>
+                {error && <p className="form-alert error">{error}</p>}
+                <div className="profile-edit-actions">
+                  <button className="btn btn-primary" type="submit" disabled={saving}>
+                    {saving ? "Saving..." : "Save"}
+                  </button>
+                  <button className="btn btn-soft" type="button" onClick={() => setEditing(false)}>Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <div className="id-card-info">
+                <div className="id-card-field">
+                  <span className="id-card-label">STUDENT NAME</span>
+                  <h2 className="id-card-value">{user.name}</h2>
+                </div>
+                <div className="id-card-field">
+                  <span className="id-card-label">EMAIL ADDRESS</span>
+                  <p className="id-card-value email">{user.email}</p>
+                </div>
+                <div className="id-card-row">
+                  <div className="id-card-field">
+                    <span className="id-card-label">ACADEMIC YEAR</span>
+                    <span className="id-card-value-pill">{user.year || "3rd Year"}</span>
+                  </div>
+                  <div className="id-card-field">
+                    <span className="id-card-label">STATUS</span>
+                    <span className="id-card-value-pill active">ACTIVE</span>
+                  </div>
+                </div>
+                <button className="btn btn-soft edit-id-btn" onClick={() => setEditing(true)}>
+                  <Icon name="settings" size={14} /> Edit Profile
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="id-card-footer">
+            <div className="id-card-barcode">
+              <span className="barcode-line thin"></span>
+              <span className="barcode-line thick"></span>
+              <span className="barcode-line medium"></span>
+              <span className="barcode-line thin"></span>
+              <span className="barcode-line thick"></span>
+              <span className="barcode-line thin"></span>
+              <span className="barcode-line medium"></span>
+              <span className="barcode-line thin"></span>
+              <span className="barcode-line thick"></span>
+              <span className="barcode-line medium"></span>
+            </div>
+            <span className="id-card-serial">ID #849204-{xp.level}</span>
+          </div>
         </article>
 
         <article className="panel profile-stats-panel">

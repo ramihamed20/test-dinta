@@ -16,8 +16,6 @@ import { useAsyncData } from "../hooks/useAsyncData.js";
 import { EmptyState, LoadingPanel, ErrorPanel, ProgressLine, SessionConfetti } from "../components/ui/index.jsx";
 import { LevelUpToast } from "../components/shared/index.jsx";
 import { StatsGrid } from "../components/shared/StatsGrid.jsx";
-import { InstallPrompt } from "../components/shared/InstallPrompt.jsx";
-
 // --- Dashboard ---
 
 export default function Dashboard({ themeSettings, activeTheme, user, deferredPrompt, onClearInstallPrompt }) {
@@ -63,11 +61,11 @@ export default function Dashboard({ themeSettings, activeTheme, user, deferredPr
   const activeInsight = onboarding.completed
     ? null
     : (data.insight || {
-        title: "Today's focus",
-        body: quotes[0],
-        actionLabel: "Practice now",
-        actionPath: "/questions"
-      });
+      title: "Today's focus",
+      body: quotes[0],
+      actionLabel: "Practice now",
+      actionPath: "/questions"
+    });
 
   return (
     <div className="dashboard-layout">
@@ -88,16 +86,6 @@ export default function Dashboard({ themeSettings, activeTheme, user, deferredPr
           }}
           onDismiss={() => {
             setEditingOnboarding(false);
-          }}
-        />
-      )}
-      {!installDismissed && deferredPrompt && (
-        <InstallPrompt
-          deferredPrompt={deferredPrompt}
-          onInstall={onClearInstallPrompt}
-          onDismiss={() => {
-            setInstallDismissed(true);
-            sessionStorage.setItem("dentify.pwa.dismissed", "true");
           }}
         />
       )}
@@ -210,8 +198,13 @@ function OnboardingWizard({ materials, defaultMaterialId, value, allowDismiss, o
   }, [value, defaultMaterialId, materials]);
 
   const selectedMaterial = materials.find((item) => String(item.id) === String(draft.focusMaterialId)) || materials[0];
-  const totalSteps = 3;
-  const stepTitles = ["Set your daily target", "Choose your first subject", "Pick your focus block"];
+  const totalSteps = 4;
+  const stepTitles = [
+    "Welcome to Dentify",
+    "Set your daily target",
+    "Choose your first subject",
+    "Pick your focus block"
+  ];
 
   function finish() {
     onSave({
@@ -227,15 +220,25 @@ function OnboardingWizard({ materials, defaultMaterialId, value, allowDismiss, o
       <article className="panel onboarding-modal">
         <div className="panel-title">
           <div>
-            <p className="eyebrow">Welcome to Dentify</p>
+            <p className="eyebrow">{step === 0 ? "DENTIFY ACADEMY" : "Welcome to Dentify"}</p>
             <h2>{stepTitles[step]}</h2>
           </div>
-          <span>{step + 1}/{totalSteps}</span>
+          {step > 0 && <span>{step}/{totalSteps - 1}</span>}
         </div>
-        <div className="onboarding-progress">
-          <i><b style={{ width: `${Math.round(((step + 1) / totalSteps) * 100)}%` }} /></i>
-        </div>
+        {step > 0 && (
+          <div className="onboarding-progress">
+            <i><b style={{ width: `${Math.round((step / (totalSteps - 1)) * 100)}%` }} /></i>
+          </div>
+        )}
         {step === 0 && (
+          <div className="onboarding-welcome-message">
+            <div className="welcome-mascot-circle">
+              <img src="/assets/logo.jpg" alt="Dentify Logo" />
+            </div>
+            <p>Welcome to your professional dental study companion. Let's configure your study plan in just 3 quick steps to personalize your daily targets, focus subjects, and review sessions.</p>
+          </div>
+        )}
+        {step === 1 && (
           <div className="choice-grid onboarding-choice-grid">
             {[10, 15, 20].map((target) => (
               <button key={target} type="button" className={draft.dailyTarget === target ? "active" : ""} onClick={() => setDraft((current) => ({ ...current, dailyTarget: target }))}>
@@ -245,7 +248,7 @@ function OnboardingWizard({ materials, defaultMaterialId, value, allowDismiss, o
             ))}
           </div>
         )}
-        {step === 1 && (
+        {step === 2 && (
           <div className="choice-grid onboarding-choice-grid subject-grid">
             {materials.map((material) => (
               <button key={material.id} type="button" className={String(draft.focusMaterialId) === String(material.id) ? "active" : ""} onClick={() => setDraft((current) => ({ ...current, focusMaterialId: String(material.id) }))}>
@@ -255,7 +258,7 @@ function OnboardingWizard({ materials, defaultMaterialId, value, allowDismiss, o
             ))}
           </div>
         )}
-        {step === 2 && (
+        {step === 3 && (
           <div className="choice-grid onboarding-choice-grid">
             {focusDurations.map((item) => (
               <button key={item.minutes} type="button" className={draft.focusMinutes === item.minutes ? "active" : ""} onClick={() => setDraft((current) => ({ ...current, focusMinutes: item.minutes }))}>
@@ -265,21 +268,28 @@ function OnboardingWizard({ materials, defaultMaterialId, value, allowDismiss, o
             ))}
           </div>
         )}
-        <div className="onboarding-summary-line">
-          <span>{draft.dailyTarget} questions/day</span>
-          <span>{selectedMaterial?.title || "Choose a subject"}</span>
-          <span>{draft.focusMinutes} min blocks</span>
-        </div>
+        {step > 0 && (
+          <div className="onboarding-summary-line">
+            <span>{draft.dailyTarget} questions/day</span>
+            <span>{selectedMaterial?.title || "Choose a subject"}</span>
+            <span>{draft.focusMinutes} min blocks</span>
+          </div>
+        )}
         <div className="focus-timer-actions">
-          {step > 0 ? (
-            <button className="btn btn-soft" type="button" onClick={() => setStep((current) => current - 1)}>Back</button>
+          {step === 0 ? (
+            <>
+              <button className="btn btn-soft" type="button" onClick={onSkip}>Skip Setup</button>
+              <button className="btn btn-primary" type="button" onClick={() => setStep(1)}>Get Started</button>
+            </>
           ) : (
-            <button className="btn btn-soft" type="button" onClick={onSkip}>Use defaults</button>
-          )}
-          {step < totalSteps - 1 ? (
-            <button className="btn btn-primary" type="button" onClick={() => setStep((current) => current + 1)}>Next</button>
-          ) : (
-            <button className="btn btn-primary" type="button" onClick={finish}>Save setup</button>
+            <>
+              <button className="btn btn-soft" type="button" onClick={() => setStep((current) => current - 1)}>Back</button>
+              {step < totalSteps - 1 ? (
+                <button className="btn btn-primary" type="button" onClick={() => setStep((current) => current + 1)}>Next</button>
+              ) : (
+                <button className="btn btn-primary" type="button" onClick={finish}>Save setup</button>
+              )}
+            </>
           )}
         </div>
         {allowDismiss && <button className="text-link onboarding-dismiss" type="button" onClick={onDismiss}>Close</button>}

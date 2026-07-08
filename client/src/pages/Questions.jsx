@@ -124,7 +124,7 @@ export default function Questions() {
     });
   }
 
-  if (loading) return <LoadingPanel />;
+  if (loading && !data.length) return <LoadingPanel />;
   if (error) return <ErrorPanel message={error} />;
 
   // Filter by search text from topbar
@@ -143,7 +143,6 @@ export default function Questions() {
   const activeMaterial = (materials || []).find((material) => String(material.id) === String(materialId));
   const activeFilters = [
     activeMaterial?.title,
-    difficulty && `${difficulty} level`,
     searchText && `"${searchText}"`
   ].filter(Boolean);
 
@@ -172,7 +171,7 @@ export default function Questions() {
 
   return (
     <Page title="Questions" subtitle="Practice with answer feedback and review capture.">
-      {(materialId || difficulty || searchText) && (
+      {(materialId || searchText) && (
         <section className="question-context" aria-label="Active question filters">
           <div>
             <Link className="back-link" to="/questions"><Icon name="chevron-left" size={16} /> All questions</Link>
@@ -204,18 +203,18 @@ export default function Questions() {
       </section>
       <div className="filter-group" aria-label="Question difficulty filter">
         {["", "Easy", "Medium", "Hard"].map((level) => (
-          <Link key={level || "all"} className={difficulty === level ? "active" : ""} to={questionLink({ difficulty: level })}>
+          <Link key={level || "all"} className={difficulty === level ? "active" : ""} to={questionLink({ difficulty: level })} preventScrollReset>
             {level || "All levels"}
           </Link>
         ))}
       </div>
       <div className="tabs-row">
-        <Link className={!materialId ? "active" : ""} to={questionLink({ materialId: "" })}>All</Link>
+        <Link className={!materialId ? "active" : ""} to={questionLink({ materialId: "" })} preventScrollReset>All</Link>
         {(materials || []).map((material) => (
-          <Link key={material.id} className={materialId === String(material.id) ? "active" : ""} to={questionLink({ materialId: String(material.id) })}>{material.title}</Link>
+          <Link key={material.id} className={materialId === String(material.id) ? "active" : ""} to={questionLink({ materialId: String(material.id) })} preventScrollReset>{material.title}</Link>
         ))}
       </div>
-      <section className="question-grid">
+      <section className="question-grid" style={loading ? { opacity: 0.5, pointerEvents: "none", transition: "opacity 0.2s" } : { transition: "opacity 0.2s" }}>
         {filteredData.map((question) => (
           <QuestionCard key={question.id} question={question} selected={selected[question.id]} feedback={feedback[question.id]} onAnswer={answer} onBookmark={bookmark} />
         ))}

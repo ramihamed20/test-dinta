@@ -5,7 +5,7 @@ export function useQuestionData(materialId, difficulty) {
   const [state, setState] = useState({ loading: true, error: "", data: [] });
   useEffect(() => {
     let active = true;
-    setState({ loading: true, error: "", data: [] });
+    setState((current) => ({ ...current, loading: true }));
     const params = new URLSearchParams();
     if (materialId) params.set("materialId", materialId);
     if (difficulty) params.set("difficulty", difficulty);
