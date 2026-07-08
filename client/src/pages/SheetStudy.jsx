@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { Icon } from "../lib/icons.jsx";
 import { Page, LoadingPanel, ErrorPanel, ProgressLine } from "../components/ui/index.jsx";
+import { assetPath } from "../lib/utils.js";
 
 export default function SheetStudy() {
   const { materialId, sheetId } = useParams();
@@ -148,7 +149,7 @@ export default function SheetStudy() {
       <PdfWorkspace 
         title={session.sheet.title} 
         subtitle="Normal Study Mode" 
-        pdfUrl="/test.pdf" 
+        pdfUrl={assetPath("/test.pdf")} 
         drawings={drawings}
         setDrawings={setDrawings}
         onClose={() => navigate(`/materials/${materialId}`)} 
@@ -174,7 +175,7 @@ export default function SheetStudy() {
             <PdfWorkspace 
               title={session.sheet.title} 
               subtitle={`Advanced Study - Pages ${session.block.pageStart}-${session.block.pageEnd}`} 
-              pdfUrl="/test.pdf" 
+              pdfUrl={assetPath("/test.pdf")} 
               drawings={drawings}
               setDrawings={setDrawings}
               onClose={() => setFullscreenPdf(false)} 
@@ -223,7 +224,7 @@ function AdvancedStudyPanel({ session, drawings, setDrawings, onQuiz, onFinal, o
             <Icon name="expand" size={14} /> Focus Mode
           </button>
         </div>
-        <PdfCanvasViewer pdfUrl="/test.pdf" drawings={drawings} setDrawings={setDrawings} enableDrawing={false} />
+        <PdfCanvasViewer pdfUrl={assetPath("/test.pdf")} drawings={drawings} setDrawings={setDrawings} enableDrawing={false} />
       </div>
       <article className="advanced-actions">
         {session.weakPoints.length > 0 && (
@@ -644,11 +645,11 @@ function usePdfJs() {
       return;
     }
     const script = document.createElement("script");
-    script.src = "/pdf.min.js";
+    script.src = assetPath("/pdf.min.js");
     script.async = true;
     script.onload = () => {
       if (window.pdfjsLib) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = assetPath("/pdf.worker.min.js");
         if (isMounted) setLoaded(true);
       }
     };
