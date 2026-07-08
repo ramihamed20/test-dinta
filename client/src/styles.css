@@ -8415,7 +8415,7 @@ body,
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
-  box-shadow: var(--shadow-sm);
+  box-shadow: none; /* remove shadow to allow seamless merge with sub-headers */
   z-index: 10;
 }
 
@@ -8577,7 +8577,7 @@ body,
 }
 
 .pdf-study-sidebar.dock-top {
-  top: 72px !important;
+  top: 71px !important;
   left: 0 !important;
   right: 0 !important;
   width: 100% !important;
