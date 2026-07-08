@@ -8558,6 +8558,135 @@ body,
   overflow: visible;
 }
 
+/* Snapping / Docking configurations */
+.pdf-study-sidebar.dock-left {
+  left: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  border-left: none !important;
+  border-radius: 0 24px 24px 0 !important;
+}
+
+.pdf-study-sidebar.dock-right {
+  left: auto !important;
+  right: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  border-right: none !important;
+  border-radius: 24px 0 0 24px !important;
+}
+
+.pdf-study-sidebar.dock-top {
+  top: 72px !important; /* right under header */
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  border-top: none !important;
+  border-radius: 0 0 24px 24px !important;
+}
+
+.pdf-study-sidebar.dock-bottom {
+  top: auto !important;
+  bottom: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  border-bottom: none !important;
+  border-radius: 24px 24px 0 0 !important;
+}
+
+/* For horizontal top/bottom docks, override flex direction to keep elements inline */
+.pdf-study-sidebar.dock-top,
+.pdf-study-sidebar.dock-bottom {
+  flex-direction: row !important;
+}
+
+.pdf-study-sidebar.dock-top .sidebar-columns-wrapper,
+.pdf-study-sidebar.dock-bottom .sidebar-columns-wrapper {
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+
+.pdf-study-sidebar.dock-top .sidebar-main-column,
+.pdf-study-sidebar.dock-bottom .sidebar-main-column {
+  flex-direction: row !important;
+  width: auto !important;
+  gap: 12px !important;
+}
+
+.pdf-study-sidebar.dock-top .sidebar-main-column > :last-child,
+.pdf-study-sidebar.dock-bottom .sidebar-main-column > :last-child {
+  margin-top: 0 !important;
+  margin-left: 12px !important;
+  border-top: none !important;
+  padding-top: 0 !important;
+  border-left: 1px solid var(--border) !important;
+  padding-left: 12px !important;
+}
+
+.pdf-study-sidebar.dock-top .sidebar-header-controls,
+.pdf-study-sidebar.dock-bottom .sidebar-header-controls {
+  flex-direction: row !important;
+  width: auto !important;
+  gap: 8px !important;
+}
+
+.pdf-study-sidebar.dock-top .sidebar-drag-handle,
+.pdf-study-sidebar.dock-bottom .sidebar-drag-handle {
+  border-bottom: none !important;
+  border-right: 1px solid var(--border) !important;
+  padding: 0 8px 0 0 !important;
+  width: auto !important;
+}
+
+.pdf-study-sidebar.dock-top .sidebar-drag-handle svg,
+.pdf-study-sidebar.dock-bottom .sidebar-drag-handle svg {
+  transform: rotate(90deg);
+}
+
+.pdf-study-sidebar.dock-top .sidebar-collapse-trigger,
+.pdf-study-sidebar.dock-bottom .sidebar-collapse-trigger {
+  position: static !important;
+  padding: 4px !important;
+}
+
+.pdf-study-sidebar.dock-top .sidebar-shelf-column,
+.pdf-study-sidebar.dock-bottom .sidebar-shelf-column {
+  flex-direction: row !important;
+  width: auto !important;
+  gap: 16px !important;
+  border-left: 1px solid var(--border) !important;
+  margin-left: 12px !important;
+  padding-left: 12px;
+  animation: slide-in-shelf-horizontal 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slide-in-shelf-horizontal {
+  0% {
+    width: 0;
+    opacity: 0;
+    margin-left: 0;
+    padding-left: 0;
+  }
+  100% {
+    width: auto;
+    opacity: 1;
+    margin-left: 12px;
+    padding-left: 12px;
+  }
+}
+
+.pdf-study-sidebar.dock-top .color-palette,
+.pdf-study-sidebar.dock-bottom .color-palette {
+  flex-direction: row !important;
+  gap: 6px !important;
+}
+
+.pdf-study-sidebar.dock-top .size-selector,
+.pdf-study-sidebar.dock-bottom .size-selector {
+  flex-direction: row !important;
+  gap: 6px !important;
+}
+
 /* Collapsed Circular Bubble State */
 .pdf-study-sidebar.collapsed {
   width: 56px;
@@ -8927,11 +9056,11 @@ body,
   }
 
   .pdf-study-sidebar {
-    left: 0;
-    right: 0;
-    top: auto;
-    bottom: 0;
-    width: 100%;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    width: 100% !important;
     max-width: none;
     max-height: min(64vh, 480px);
     border: 1px solid var(--border);

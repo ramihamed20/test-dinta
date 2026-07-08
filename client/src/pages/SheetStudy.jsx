@@ -323,6 +323,7 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
   const [stylusActive, setStylusActive] = useState(false); // true once a pen/stylus pointer is seen this session
   const [toolbarPosition, setToolbarPosition] = useState({ x: 24, y: 120 });
   const [isMobile, setIsMobile] = useState(false);
+  const [dockPosition, setDockPosition] = useState("left"); // "left", "right", "top", "bottom", "floating"
 
   const isDraggingRef = useRef(false);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
@@ -359,6 +360,10 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
     dragStartPos.current = { x: e.clientX, y: e.clientY };
     hasDragged.current = false;
     isDraggingRef.current = true;
+    
+    // Switch dockPosition to floating immediately so it follows the cursor
+    setDockPosition("floating");
+    
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
@@ -393,7 +398,28 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
     // Click trigger if no drag occurred
     if (!hasDragged.current) {
       setIsSidebarOpen(prev => !prev);
+      return;
     }
+
+    // Determine final snap/dock position based on release coordinates
+    const finalX = e.clientX - dragOffsetRef.current.x;
+    const finalY = e.clientY - dragOffsetRef.current.y;
+    const sidebarWidth = isSidebarOpen ? (activeTool === "pen" || activeTool === "highlighter" ? 144 : 76) : 56;
+    const sidebarHeight = isSidebarOpen ? 290 : 56;
+
+    let newDock = "floating";
+
+    if (finalX < 80) {
+      newDock = "left";
+    } else if (finalX > window.innerWidth - sidebarWidth - 80) {
+      newDock = "right";
+    } else if (finalY < 120) {
+      newDock = "top";
+    } else if (finalY > window.innerHeight - sidebarHeight - 80) {
+      newDock = "bottom";
+    }
+
+    setDockPosition(newDock);
   };
 
   return (
@@ -425,8 +451,14 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
 
       {/* Floating Toolbar Sidebar */}
       <aside 
-        className={`pdf-study-sidebar ${isSidebarOpen ? "open" : "collapsed"}`}
-        style={{ left: `${toolbarPosition.x}px`, top: `${toolbarPosition.y}px` }}
+        className={`pdf-study-sidebar ${isSidebarOpen ? "open" : "collapsed"} ${
+          isDraggingRef.current ? "dock-floating" : `dock-${dockPosition}`
+        }`}
+        style={
+          isDraggingRef.current || dockPosition === "floating" || isMobile
+            ? { left: `${toolbarPosition.x}px`, top: `${toolbarPosition.y}px` }
+            : {}
+        }
       >
         {!isSidebarOpen && !isMobile ? (
           /* Collapsed Bubble Trigger for Desktop */
