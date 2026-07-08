@@ -8589,6 +8589,8 @@ body,
   border-bottom: 1px solid var(--border) !important;
   border-radius: 0 !important;
   padding: 0 24px !important;
+  background: var(--surface) !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05) !important;
 }
 
 .pdf-study-sidebar.dock-bottom {
@@ -8605,6 +8607,8 @@ body,
   border-top: 1px solid var(--border) !important;
   border-radius: 0 !important;
   padding: 0 24px !important;
+  background: var(--surface) !important;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.05) !important;
 }
 
 /* For horizontal top/bottom docks, override flex direction to keep elements inline */
