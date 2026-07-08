@@ -344,7 +344,7 @@ function PdfWorkspace({ title, subtitle, pdfUrl, drawings, setDrawings, onClose 
             <button className="icon-btn" onClick={() => setZoomScale(z => Math.max(0.8, z - 0.1))} title="تصغير">
               <Icon name="minus" size={16} />
             </button>
-            <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, minWidth: "48px", textAlign: "center", color: "var(--text-primary)" }}>
+            <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, minWidth: "48px", textAlign: "center", color: "var(--text)" }}>
               {Math.round(zoomScale * 100)}%
             </span>
             <button className="icon-btn" onClick={() => setZoomScale(z => Math.min(3.0, z + 0.1))} title="تكبير">

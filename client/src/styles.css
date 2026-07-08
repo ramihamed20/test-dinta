@@ -8588,7 +8588,7 @@ body,
 }
 
 .sidebar-toggle-tab:hover {
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   background: var(--bg-hover);
   width: 48px; /* expands slightly on hover */
   right: -48px;
@@ -8656,7 +8656,7 @@ body,
 
 .tool-button:hover {
   background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .tool-button.active {
@@ -8712,7 +8712,7 @@ body,
 }
 
 .color-dot.active .color-dot-swatch {
-  border-color: var(--text-primary);
+  border-color: var(--color-text-primary);
   transform: scale(1.1);
 }
 
@@ -8746,13 +8746,13 @@ body,
 
 .size-button:hover {
   background: var(--bg-2);
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .size-button.active {
-  background: var(--text-primary);
+  background: var(--color-text-primary);
   color: var(--bg);
-  border-color: var(--text-primary);
+  border-color: var(--color-text-primary);
 }
 
 /* ===== PDF WORKSPACE RESPONSIVENESS ===== */
