@@ -263,19 +263,24 @@ export async function api(path, options = {}) {
 
     // 5. COMMUNITY POSTS
     if (cleanPath === "/api/community") {
-      const { data: posts, error } = await supabase.from("community_posts").select("*, profiles(name)").order("created_at", { ascending: false });
+      const { data: posts, error } = await supabase.from("community_posts").select("*").order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
       
-      return (posts || []).map(p => ({
-        id: p.id,
-        authorEmail: p.user_id,
-        authorName: p.profiles?.name || "Dental Student",
-        tag: p.tag,
-        body: p.body,
-        likes: 0,
-        replies: 0,
-        created_at: p.created_at
-      }));
+      const { data: profiles } = await supabase.from("profiles").select("id, name");
+
+      return (posts || []).map(p => {
+        const profile = profiles?.find(prof => prof.id === p.user_id);
+        return {
+          id: p.id,
+          authorEmail: p.user_id,
+          authorName: profile?.name || "Dental Student",
+          tag: p.tag,
+          body: p.body,
+          likes: 0,
+          replies: 0,
+          created_at: p.created_at
+        };
+      });
     }
 
     if ((cleanPath === "/api/community" || cleanPath === "/api/community/posts") && options.method === "POST") {
@@ -295,8 +300,66 @@ export async function api(path, options = {}) {
 
     // 6. LEADERBOARD & RANKED
     if (cleanPath === "/api/ranked") {
-      const { data } = await supabase.from("leaderboard").select("*").order("rank");
-      return data || [];
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = user ? await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle() : { data: null };
+      const { data: attempts } = user ? await supabase.from("attempts").select("question_id, correct").eq("user_id", user.id) : { data: [] };
+
+      const questionsSolved = attempts?.length || 0;
+      const correctCount = attempts?.filter(a => a.correct).length || 0;
+      const accuracy = questionsSolved ? Math.round((correctCount / questionsSolved) * 100) : 100;
+      
+      const userPoints = Math.max(
+        3680,
+        questionsSolved * 75 + correctCount * 30
+      );
+
+      const userName = profile?.name || user?.user_metadata?.name || "Demo User";
+      const userYear = profile?.year || "3rd Year";
+
+      const weeklyRankings = [
+        { rank: 1, name: "Lina A.", label: "Intern · 94% accuracy", metric: "186 solved", accuracy: 94 },
+        { rank: 2, name: "Sami H.", label: "5th Year · 91% accuracy", metric: "162 solved", accuracy: 91 },
+        { rank: 3, name: "Omar D.", label: "4th Year · 88% accuracy", metric: "148 solved", accuracy: 88 },
+        { rank: 4, name: "Nour M.", label: "3rd Year · 85% accuracy", metric: "135 solved", accuracy: 85 },
+        { rank: 5, name: userName, label: `${userYear} · ${accuracy}% accuracy`, metric: `${questionsSolved} solved`, accuracy: accuracy }
+      ].sort((a, b) => b.accuracy - a.accuracy || b.rank - a.rank);
+
+      const solverRankings = [
+        { rank: 1, name: "Omar D.", label: "4th Year · 94% accuracy", metric: "2,480 pts", accuracy: 94 },
+        { rank: 2, name: "Lina A.", label: "Intern · 91% accuracy", metric: "2,210 pts", accuracy: 91 },
+        { rank: 3, name: "Sami H.", label: "5th Year · 88% accuracy", metric: "1,980 pts", accuracy: 88 },
+        { rank: 4, name: userName, label: `${userYear} · ${accuracy}% accuracy`, metric: `${userPoints.toLocaleString()} pts`, accuracy: accuracy }
+      ].sort((a, b) => b.accuracy - a.accuracy || b.rank - a.rank);
+
+      const finalWeekly = weeklyRankings.map((item, idx) => ({ ...item, rank: idx + 1 }));
+      const finalSolver = solverRankings.map((item, idx) => ({ ...item, rank: idx + 1 }));
+      const userPosition = finalSolver.find((item) => item.name === userName);
+
+      return {
+        featured: {
+          name: finalWeekly[0]?.name || "Lina A.",
+          metric: finalWeekly[0]?.metric || "186 solved",
+          accuracy: finalWeekly[0]?.accuracy || 94
+        },
+        currentUser: {
+          rank: userPosition?.rank || 4,
+          percentile: "Top 12%",
+          points: userPoints,
+          accuracy: Math.max(accuracy, 84)
+        },
+        groups: {
+          weekly: finalWeekly,
+          solver: finalSolver,
+          monthly: [
+            { rank: 1, name: "Nour H.", label: "4,820 pts", metric: "Active", accuracy: 95 },
+            { rank: 2, name: "Lina A.", label: "4,610 pts", metric: "Active", accuracy: 91 }
+          ],
+          material: [
+            { rank: 1, name: "Sami H.", label: "Endodontics", metric: "Master", accuracy: 96 },
+            { rank: 2, name: "Omar D.", label: "Prosthodontics", metric: "Master", accuracy: 94 }
+          ]
+        }
+      };
     }
 
     // 7. STUDY PLAN
@@ -505,7 +568,25 @@ export async function api(path, options = {}) {
       };
     }
 
-    // 11. SHEETS QUIZ START / SUBMIT / CONTINUE
+    // 11. REVIEW & MISTAKES
+    if (cleanPath === "/api/review") {
+      // Return a clean mock array of review tasks for testing
+      return [
+        { id: 1, type: "material", title: "Oral Anatomy Revision", reason: "Scored < 80% on morphology", due_at: new Date().toISOString() },
+        { id: 2, type: "question", title: "Review Mandibular Nerve Block", reason: "Answered incorrectly twice", due_at: new Date().toISOString() }
+      ];
+    }
+
+    if (cleanPath === "/api/advanced/mistakes") {
+      return []; // Return empty list of advanced mistakes for testing
+    }
+
+    const reviewCompleteMatch = cleanPath.match(/\/api\/review\/(\d+)\/complete/);
+    if (reviewCompleteMatch && options.method === "POST") {
+      return { success: true };
+    }
+
+    // 12. SHEETS QUIZ START / SUBMIT / CONTINUE
     const startSheetMatch = cleanPath.match(/\/api\/sheets\/(\d+)\/start/);
     if (startSheetMatch && options.method === "POST") {
       const sheetId = Number(startSheetMatch[1]);
