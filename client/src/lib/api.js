@@ -266,27 +266,50 @@ export async function api(path, options = {}) {
       const { data: posts, error } = await supabase.from("community_posts").select("*").order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
       
-      const { data: profiles } = await supabase.from("profiles").select("id, name");
+      const { data: profiles } = await supabase.from("profiles").select("id, name, year");
 
-      return (posts || []).map(p => {
+      const mappedPosts = (posts || []).map(p => {
         const profile = profiles?.find(prof => prof.id === p.user_id);
         return {
           id: p.id,
-          authorEmail: p.user_id,
-          authorName: profile?.name || "Dental Student",
+          author: profile?.name || "Dental Student",
+          year: profile?.year || "3rd Year",
           tag: p.tag,
           body: p.body,
-          likes: 0,
-          replies: 0,
-          created_at: p.created_at
+          likes: p.likes || 0,
+          replies: p.replies || 0,
+          createdAt: p.created_at
         };
       });
+
+      const announcements = [
+        { id: 1, title: "Operative Dentistry sheet updated", body: "A cleaner caries preparation sheet is available for today's review block.", tag: "gold", createdAt: new Date(Date.now() - 3600000).toISOString() },
+        { id: 2, title: "Exam room list tomorrow", body: "The final exam room list will be posted after the department confirms batches.", tag: "purple", createdAt: new Date(Date.now() - 7200000).toISOString() },
+        { id: 3, title: "New prosthodontics summary added", body: "A concise impression materials summary was added for quick pre-lab reading.", tag: "green", createdAt: new Date(Date.now() - 86400000).toISOString() }
+      ];
+
+      const buddy = {
+        name: "Sara K.",
+        sharedGoal: "Solve 15 Endodontics questions",
+        label: "4th Year",
+        metric: "18 XP away",
+        accuracy: 92,
+        userSignal: "Active 5m ago"
+      };
+
+      return {
+        posts: mappedPosts,
+        announcements,
+        buddy
+      };
     }
 
     if ((cleanPath === "/api/community" || cleanPath === "/api/community/posts") && options.method === "POST") {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
       const payload = JSON.parse(options.body || "{}");
+
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
 
       const { data, error } = await supabase.from("community_posts").insert({
         user_id: user.id,
@@ -295,7 +318,17 @@ export async function api(path, options = {}) {
       }).select().single();
       
       if (error) throw new Error(error.message);
-      return data;
+
+      return {
+        id: data.id,
+        author: profile?.name || "Dental Student",
+        year: profile?.year || "3rd Year",
+        tag: data.tag,
+        body: data.body,
+        likes: 0,
+        replies: 0,
+        createdAt: data.created_at
+      };
     }
 
     // 6. LEADERBOARD & RANKED
