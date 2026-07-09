@@ -496,23 +496,76 @@ export async function api(path, options = {}) {
     // 9. ANALYTICS & PROGRESS
     if (cleanPath === "/api/analytics") {
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: attempts } = user ? await supabase.from("attempts").select("question_id, correct").eq("user_id", user.id) : { data: [] };
-      
+      const { data: attempts } = user ? await supabase.from("attempts").select("question_id, correct, created_at").eq("user_id", user.id) : { data: [] };
+      const { data: questions } = await supabase.from("questions").select("id, material_id, difficulty");
+      const { data: bookmarks } = user ? await supabase.from("bookmarks").select("id").eq("user_id", user.id) : { data: [] };
+      const { data: materials } = await supabase.from("materials").select("*").order("order_index");
+
       const questionsSolved = attempts?.length || 0;
       const correctCount = attempts?.filter(a => a.correct).length || 0;
       const accuracy = questionsSolved ? Math.round((correctCount / questionsSolved) * 100) : 85;
 
-      return {
-        readiness: Math.min(100, Math.round((questionsSolved / 8) * 100)),
+      const stats = {
+        materialsCompleted: 0,
+        questionsSolved,
         accuracy,
-        totalAttempts: questionsSolved,
-        solvedByDay: [
-          { date: "Mon", count: questionsSolved },
-          { date: "Tue", count: 0 },
-          { date: "Wed", count: 0 },
-          { date: "Thu", count: 0 },
-          { date: "Fri", count: 0 }
-        ]
+        savedItems: bookmarks?.length || 0,
+        dueReviewCount: 3
+      };
+
+      const enrichedMaterials = (materials || []).map(m => {
+        const matQuestions = questions?.filter(q => q.material_id === m.id) || [];
+        const solvedCount = matQuestions.filter(q => attempts?.some(a => a.question_id === q.id)).length;
+        const progress = matQuestions.length ? Math.round((solvedCount / matQuestions.length) * 100) : 0;
+        
+        const matAttempts = attempts?.filter(a => matQuestions.some(q => q.id === a.question_id)) || [];
+        const matCorrect = matAttempts.filter(a => a.correct).length;
+        const matAccuracy = matAttempts.length ? Math.round((matCorrect / matAttempts.length) * 100) : 0;
+        
+        return {
+          id: m.id,
+          title: m.title,
+          slug: m.slug,
+          description: m.description,
+          icon: m.icon,
+          progress,
+          attempts: solvedCount,
+          accuracy: matAccuracy
+        };
+      });
+
+      stats.materialsCompleted = enrichedMaterials.filter(m => m.progress === 100).length;
+
+      const solvedByDayMap = {};
+      (attempts || []).forEach(a => {
+        try {
+          const dateStr = new Date(a.created_at).toISOString().slice(0, 10);
+          solvedByDayMap[dateStr] = (solvedByDayMap[dateStr] || 0) + 1;
+        } catch(e) {}
+      });
+      const solvedByDay = Object.entries(solvedByDayMap).map(([date, count]) => ({ date, count }));
+
+      const difficulties = ["Easy", "Medium", "Hard"];
+      const difficultyData = difficulties.map(diff => {
+        const diffQuestions = questions?.filter(q => q.difficulty === diff) || [];
+        const diffAttempts = attempts?.filter(a => diffQuestions.some(q => q.id === a.question_id)) || [];
+        const diffCorrect = diffAttempts.filter(a => a.correct).length;
+        const diffAccuracy = diffAttempts.length ? Math.round((diffCorrect / diffAttempts.length) * 100) : 0;
+        const coverage = diffQuestions.length ? Math.min(100, Math.round((diffAttempts.length / diffQuestions.length) * 100)) : 0;
+        return {
+          difficulty: diff,
+          total: diffQuestions.length,
+          attempts: diffAttempts.length,
+          accuracy: diffAccuracy,
+          coverage
+        };
+      });
+
+      return {
+        stats,
+        materials: enrichedMaterials,
+        solvedByDay,
+        difficulty: difficultyData
       };
     }
 
@@ -522,6 +575,7 @@ export async function api(path, options = {}) {
       const { data: questions } = await supabase.from("questions").select("id, material_id");
       const { data: materials } = await supabase.from("materials").select("*").order("order_index");
       const { data: bookmarks } = user ? await supabase.from("bookmarks").select("*").eq("user_id", user.id) : { data: [] };
+      const { data: studyPlan } = user ? await supabase.from("study_plan").select("*").eq("user_id", user.id).order("time") : { data: [] };
 
       const enrichedMaterials = (materials || []).map(m => {
         const matQuestions = questions?.filter(q => q.material_id === m.id) || [];
@@ -552,9 +606,7 @@ export async function api(path, options = {}) {
           dueReviewCount: 3
         },
         materials: enrichedMaterials,
-        solvedByDay: [
-          { day: "Mon", count: questionsSolved }
-        ]
+        studyPlan: studyPlan || []
       };
     }
 
